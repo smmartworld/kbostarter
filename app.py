@@ -258,7 +258,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             dt_str = selected_dt.strftime('%Y-%m-%d')
             is_overridden = (team, dt_str) in st.session_state.overrides
             
-            use_manual = st.toggle(f"🛠️ 관리자: 오피셜 수동 확정", value=is_overridden, key=f"man_{team}_{dt_str}")
+            use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
             
             if use_manual:
                 current_val = st.session_state.overrides.get((team, dt_str), "")
@@ -292,7 +292,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             show_pitcher = st.session_state[pitcher_key]
 
             if is_overridden:
-                st.info(f"👉 관리자 강제 지정됨: 🎯 {show_pitcher}")
+                st.info(f"👉 수동 지정됨: 🎯 {show_pitcher}")
             else:
                 st.markdown('<div class="sec-label">🎯 로테이션 멤버 선택</div>', unsafe_allow_html=True)
                 btn_cols = st.columns(len(rotation_df))
@@ -315,7 +315,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             else: st.caption("최근 경기 기록 없음")
 
         st.divider()
-        st.markdown(f"**🔄 {team} 최근 로테이션 흐름 (수동확정 포함)**")
+        st.markdown(f"**🔄 {team} 최근 로테이션 흐름**")
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         if not rot_list.empty: st.dataframe(rot_list, hide_index=True, use_container_width=True)
 
