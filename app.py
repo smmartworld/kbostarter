@@ -50,17 +50,17 @@ st.markdown("""
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     
-    /* 🔥 잼민이의 버튼 무적 줄바꿈 & 세로 높이 확장 CSS 🔥 */
+    /* 버튼 줄바꿈 & 3줄 높이 강제 고정 CSS */
     div[data-testid="stButton"] button {
         height: auto !important;
         min-height: 75px !important; 
-        padding: 6px 2px !important; /* 좌우 여백을 줄여서 글자가 더 많이 들어가게! */
+        padding: 6px 2px !important;
     }
     div[data-testid="stButton"] button p {
-        white-space: pre-wrap !important; /* 강제 줄바꿈 허용 */
-        word-break: keep-all !important;  /* 단어 단위로 예쁘게 끊기 */
-        line-height: 1.4 !important;      /* 줄 간격 조절 */
-        font-size: 0.85rem !important;    /* 폰트 사이즈 살짝 축소 */
+        white-space: pre-wrap !important; 
+        word-break: keep-all !important;  
+        line-height: 1.4 !important;      
+        font-size: 0.85rem !important;    
     }
 </style>
 """, unsafe_allow_html=True)
@@ -256,48 +256,44 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        dt_str = selected_dt.strftime('%Y-%m-%d')
-        is_overridden = (team, dt_str) in st.session_state.overrides
-        use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
-        
-        if use_manual:
-            current_val = st.session_state.overrides.get((team, dt_str), "")
-            c1, c2, c3 = st.columns([5, 2, 2])
-            with c1:
-                manual_p = st.text_input("투수 이름", value=current_val, key=f"inp_{team}_{dt_str}", label_visibility="collapsed")
-            with c2:
-                if st.button("적용", key=f"apply_{team}_{dt_str}", use_container_width=True):
-                    if manual_p:
-                        st.session_state.overrides[(team, dt_str)] = manual_p.strip()
-                        st.session_state[pitcher_key] = manual_p.strip() 
-                        st.rerun()
-            with c3:
-                if st.button("초기화", key=f"clear_{team}_{dt_str}", use_container_width=True):
-                    if is_overridden:
-                        del st.session_state.overrides[(team, dt_str)]
-                        st.session_state[pitcher_key] = None
-                        st.rerun()
-        else:
-            if is_overridden:
-                del st.session_state.overrides[(team, dt_str)]
-                st.session_state[pitcher_key] = None
-                st.rerun()
-
         if status == '종료':
             actual_row = working_df[(working_df['날짜'] == selected_dt) & (working_df['팀'] == team) & (working_df['상태'] == '종료')]
-            if actual_row.empty: 
-                st.warning("선발 기록 없음")
-                return
+            if actual_row.empty: st.warning("선발 기록 없음"); return
             r = actual_row.iloc[0]
             st.markdown(f'<div class="sec-label">실제 선발 투수</div><div style="font-size:1.4rem;font-weight:900;">{r["선발투수"]}</div>', unsafe_allow_html=True)
             st.markdown(f'<span class="stat-badge">이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">자책점 <b>{r["자책점"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
-            show_pitcher = r["선발투수"] 
         else:
+            dt_str = selected_dt.strftime('%Y-%m-%d')
+            is_overridden = (team, dt_str) in st.session_state.overrides
+            
+            use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
+            
+            if use_manual:
+                current_val = st.session_state.overrides.get((team, dt_str), "")
+                c1, c2, c3 = st.columns([5, 2, 2])
+                with c1:
+                    manual_p = st.text_input("투수 이름", value=current_val, key=f"inp_{team}_{dt_str}", label_visibility="collapsed")
+                with c2:
+                    if st.button("적용", key=f"apply_{team}_{dt_str}", use_container_width=True):
+                        if manual_p:
+                            st.session_state.overrides[(team, dt_str)] = manual_p.strip()
+                            st.session_state[pitcher_key] = manual_p.strip() 
+                            st.rerun()
+                with c3:
+                    if st.button("초기화", key=f"clear_{team}_{dt_str}", use_container_width=True):
+                        if is_overridden:
+                            del st.session_state.overrides[(team, dt_str)]
+                            st.session_state[pitcher_key] = None
+                            st.rerun()
+            else:
+                if is_overridden:
+                    del st.session_state.overrides[(team, dt_str)]
+                    st.session_state[pitcher_key] = None
+                    st.rerun()
+
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt)
             
-            if rotation_df.empty: 
-                st.warning("데이터 부족")
-                return
+            if rotation_df.empty: st.warning("데이터 부족"); return
 
             if st.session_state[pitcher_key] is None:
                 st.session_state[pitcher_key] = st.session_state.overrides.get((team, dt_str), predicted)
@@ -314,21 +310,25 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     with btn_cols[j]:
                         is_active = (show_pitcher == pname)
                         
-                        if pname == predicted and is_official:
-                            btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
+                        # 🔥 4단계 업그레이드: 괄호 빼고 "🎯 예상" 으로 텍스트 변경
+                        if pname == predicted:
+                            if is_official:
+                                btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
+                            else:
+                                btn_text = f"🎯 예상\n{pname}\n({rot_row['휴식일']}일)"
                         else:
                             btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                             
                         if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
                             st.session_state[pitcher_key] = pname; st.rerun()
 
-        if show_pitcher and show_pitcher != '-':
-            s = get_season_stats(working_df, show_pitcher, selected_dt)
-            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
-            if 'WHIP' in s:
-                st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+            if show_pitcher:
+                s = get_season_stats(working_df, show_pitcher, selected_dt)
+                st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+                if 'WHIP' in s:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
@@ -336,19 +336,20 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             recent = get_pitcher_recent_stats(working_df, show_pitcher, selected_dt, n=5)
             
             if not recent.empty: 
+                # 🔥 4단계 업그레이드: 표 모든 데이터 중앙 정렬(center) 강제 적용!
                 st.dataframe(
                     recent, 
                     hide_index=True, 
                     use_container_width=True,
                     column_config={
-                        "날짜": st.column_config.TextColumn("날짜", alignment="right"),
-                        "상대팀": st.column_config.TextColumn("상대팀", alignment="right"),
-                        "이닝": st.column_config.TextColumn("이닝", alignment="right"),
-                        "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="right"),
-                        "피안타": st.column_config.NumberColumn("피안타", format="%d", alignment="right"),
-                        "사사구": st.column_config.NumberColumn("사사구", format="%d", alignment="right"),
-                        "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="right"),
-                        "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="right")
+                        "날짜": st.column_config.TextColumn("날짜", alignment="center"),
+                        "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
+                        "이닝": st.column_config.TextColumn("이닝", alignment="center"),
+                        "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
+                        "피안타": st.column_config.NumberColumn("피안타", format="%d", alignment="center"),
+                        "사사구": st.column_config.NumberColumn("사사구", format="%d", alignment="center"),
+                        "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
+                        "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                     }
                 )
             else: 
@@ -359,18 +360,19 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         
         if not rot_list.empty: 
+            # 🔥 4단계 업그레이드: 로테이션 표도 동일하게 중앙 정렬(center) 강제 적용!
             st.dataframe(
                 rot_list, 
                 hide_index=True, 
                 use_container_width=True,
                 column_config={
-                    "날짜": st.column_config.TextColumn("날짜", alignment="right"),
-                    "상대팀": st.column_config.TextColumn("상대팀", alignment="right"),
-                    "선발투수": st.column_config.TextColumn("선발투수", alignment="right"),
-                    "이닝": st.column_config.TextColumn("이닝", alignment="right"),
-                    "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="right"),
-                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="right"),
-                    "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="right")
+                    "날짜": st.column_config.TextColumn("날짜", alignment="center"),
+                    "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
+                    "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
+                    "이닝": st.column_config.TextColumn("이닝", alignment="center"),
+                    "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
+                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
+                    "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                 }
             )
 
