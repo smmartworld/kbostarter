@@ -14,26 +14,34 @@ st.markdown("""
 <style>
     header {visibility: hidden;}
     #MainMenu {visibility: hidden;}
-    .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 1200px; }
-    .stApp { background: #ffffff; }
+    
+    /* 🚨 1단계: 스트림릿의 반응형 레이아웃 억제 (강제 고정폭) */
+    .block-container { 
+        padding-top: 1rem; 
+        padding-bottom: 0rem; 
+        max-width: 1200px !important; 
+        min-width: 800px !important; /* 모바일에서도 화면을 강제로 800px 넓이로 고정! */
+    }
+    
+    /* 🚨 2단계: 화면 밖으로 튀어나간 건 좌우로 스크롤 가능하게 */
+    .stApp { 
+        background: #ffffff; 
+        overflow-x: auto; /* 전체 화면 가로 스크롤 허용 */
+    }
+    
     .main-title { text-align: center; font-size: 2rem; font-weight: 900; color: #1a202c; margin-bottom: 2px; }
     
-    /* 🚑 모바일 심폐소생술: 달력 가로 스크롤 (스와이프) 강제 적용! */
-    .cal-wrap { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; }
-    @media (max-width: 768px) {
-        .block-container { padding-left: 0.2rem; padding-right: 0.2rem; }
-        .cal-wrap { overflow-x: auto; padding: 10px; }
-        /* 7일치 달력이 밑으로 안 떨어지게 강제 묶기 */
-        .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 550px !important; }
-        .cal-wrap div[data-testid="column"] { min-width: 75px !important; width: 14% !important; flex: 1 1 auto !important; }
-        /* 버튼 텍스트가 안 잘리도록 여백 다이어트 */
-        div[data-testid="stButton"] button { padding: 0.2rem 0 !important; font-size: 0.75rem; }
-    }
-
+    /* 달력 강제 가로 유지 */
+    .cal-wrap { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; min-width: 750px !important; }
     .cal-nav-title { text-align: center; font-size: 1.15rem; font-weight: 800; color: #2d3748; padding: 4px 0; }
     .cal-day-name { text-align: center; font-size: 0.78rem; font-weight: 700; color: #718096; padding: 8px 0 4px 0; }
     .cal-empty { height: 36px; }
     .cal-noGame { text-align: center; padding: 6px 0; font-size: 0.88rem; color: #cbd5e0; height: 36px; }
+    
+    /* 🚨 3단계: 스트림릿이 임의로 쪼개는 컬럼(Column)들을 강제로 한 줄에 묶기 */
+    div[data-testid="column"] { 
+        min-width: 0 !important; /* 컬럼 최소 넓이 해제 */
+    }
     
     .match-card { background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px 8px; text-align: center; margin-bottom: 4px; min-height: 100px; }
     .match-card.sel { background: #ebf8ff; border-color: #4299e1; }
@@ -42,14 +50,13 @@ st.markdown("""
     .mc-plan { font-size: 0.78rem; color: #c05621; font-weight: 600; }
     .mc-cancel { font-size: 0.78rem; color: #9b2c2c; }
     .mc-manual { font-size: 0.78rem; color: #3182ce; font-weight: 800; }
-    .team-panel { background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 16px; height: 100%; }
+    .team-panel { background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px 16px; height: 100%; min-width: 350px !important; }
     .team-name-big { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
     .team-label-small { font-size: 0.7rem; font-weight: 700; color: #a0aec0; }
     .sec-label { font-size: 0.72rem; font-weight: 800; color: #a0aec0; margin: 12px 0 5px 0; }
     .score-banner { background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 10px; padding: 10px 20px; text-align: center; font-size: 1.35rem; font-weight: 800; color: #276749; margin: 8px 0 16px 0; }
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
     
-    /* 스탯 뱃지 줄바꿈 방지 */
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     .css-logo { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .css-logo-large { width: 50px; height: 50px; font-size: 1.1rem; }
