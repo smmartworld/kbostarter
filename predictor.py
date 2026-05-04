@@ -15,7 +15,6 @@ def get_active_rotation(df, team, target_date):
 def predict_starter(df, team, target_date):
     target_dt = pd.to_datetime(target_date)
     
-    # 💡 1. 오피셜 선발 감지 로직 (is_official 플래그 추가!)
     official_row = df[(df['날짜'] == target_dt) & (df['팀'] == team) & (df['상태'] == '예정') & (df['선발투수'] != '-')].copy()
     is_official = False
     if not official_row.empty:
@@ -37,9 +36,13 @@ def predict_starter(df, team, target_date):
         p_games = past_df[past_df['선발투수'] == p].sort_values('날짜')
         if not p_games.empty:
             last_game_dt = p_games.iloc[-1]['날짜']
-            # 🔥 2. 야구식 휴식일 계산법 적용! (차이 - 1일)
-            # 단, 연투(0일 휴식)일 경우 음수가 되지 않도록 최소값을 0으로 처리
-            rest_days = max(0, (target_dt - last_game_dt).days - 1) 
+            rest_days = max(0, (target_dt - last_game_dt).days - 1)
+            
+            # 🔥 9일 룰 적용 (선발 로테이션 배제)
+            # 휴식일이 9일 이상이고, 그 선수가 오늘 '오피셜 선발'로 뜬 게 아니라면 목록에서 제외!
+            if rest_days >= 9 and p != official_starter:
+                continue
+                
             rot_data.append({'선발투수': p, '최근등판': last_game_dt, '휴식일': rest_days})
             
     if not rot_data: return (official_starter if official_starter else "예측 불가"), pd.DataFrame(), is_official
@@ -49,16 +52,14 @@ def predict_starter(df, team, target_date):
     
     predicted_pitcher = official_starter if official_starter else rot_df.iloc[0]['선발투수']
     
-    # 💡 is_official 정보도 같이 넘겨줌!
     return predicted_pitcher, rot_df[['선발투수', '휴식일']], is_official
 
 def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
-    # 🔥 2. 여기 휴식일 계산도 똑같이 (차이 - 1) 적용!
     pitcher_df['휴식일'] = (pitcher_df['날짜'].diff().dt.days - 1).fillna(0).astype(int)
-    pitcher_df.loc[pitcher_df['휴식일'] < 0, '휴식일'] = 0 # 예외 방어
+    pitcher_df.loc[pitcher_df['휴식일'] < 0, '휴식일'] = 0 
     
     recent = pitcher_df.tail(n).copy()
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
@@ -125,7 +126,6 @@ def get_recent_rotation_list(df, team, target_date, n=10):
         p_date = row['날짜']
         prev_games = df[(df['선발투수'] == p_name) & (df['상태'] == '종료') & (df['날짜'] < p_date)].sort_values('날짜')
         if not prev_games.empty:
-            # 🔥 2. 여기도 똑같이 야구식 계산법 (차이 - 1) 적용!
             rest_days = max(0, (p_date - prev_games.iloc[-1]['날짜']).days - 1)
             rest_days_list.append(rest_days)
         else:
