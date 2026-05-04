@@ -50,8 +50,18 @@ st.markdown("""
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     
-    /* 💡 버튼 내 텍스트 줄바꿈 유지 (CSS) */
-    div[data-testid="stButton"] button p { white-space: pre-wrap; line-height: 1.3; }
+    /* 🔥 잼민이의 버튼 무적 줄바꿈 & 세로 높이 확장 CSS 🔥 */
+    div[data-testid="stButton"] button {
+        height: auto !important;
+        min-height: 75px !important; 
+        padding: 6px 2px !important; /* 좌우 여백을 줄여서 글자가 더 많이 들어가게! */
+    }
+    div[data-testid="stButton"] button p {
+        white-space: pre-wrap !important; /* 강제 줄바꿈 허용 */
+        word-break: keep-all !important;  /* 단어 단위로 예쁘게 끊기 */
+        line-height: 1.4 !important;      /* 줄 간격 조절 */
+        font-size: 0.85rem !important;    /* 폰트 사이즈 살짝 축소 */
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -304,8 +314,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     with btn_cols[j]:
                         is_active = (show_pitcher == pname)
                         
-                        # 🔥 버튼 디자인 완벽 통일! 
-                        # 오피셜이면 3줄(✅오피셜, 이름, 휴식일), 아니면 빈칸 넣어서 3줄(\n, 이름, 휴식일)
                         if pname == predicted and is_official:
                             btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
@@ -328,7 +336,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             recent = get_pitcher_recent_stats(working_df, show_pitcher, selected_dt, n=5)
             
             if not recent.empty: 
-                # 🔥 Streamlit column_config를 사용해서 표의 모든 데이터 우측 정렬 강제 적용!
                 st.dataframe(
                     recent, 
                     hide_index=True, 
@@ -352,7 +359,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         
         if not rot_list.empty: 
-            # 🔥 로테이션 표도 동일하게 우측 정렬 강제 적용!
             st.dataframe(
                 rot_list, 
                 hide_index=True, 
