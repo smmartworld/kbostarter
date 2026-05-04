@@ -87,9 +87,24 @@ def get_recent_rotation_list(df, team, target_date, n=10):
     if recent.empty: return pd.DataFrame()
 
     recent = recent.sort_values('날짜', ascending=True)
+
+    # 🔥 휴식일 계산 로직 추가! (해당 투수의 이전 등판일 찾기)
+    rest_days_list = []
+    for _, row in recent.iterrows():
+        p_name = row['선발투수']
+        p_date = row['날짜']
+        prev_games = df[(df['선발투수'] == p_name) & (df['상태'] == '종료') & (df['날짜'] < p_date)].sort_values('날짜')
+        if not prev_games.empty:
+            rest_days = (p_date - prev_games.iloc[-1]['날짜']).days
+            rest_days_list.append(rest_days)
+        else:
+            rest_days_list.append(0) # 기록 없으면 0
+
+    recent['휴식일'] = rest_days_list
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
+    
     for c in ['투구수', '자책점']:
         recent[c] = pd.to_numeric(recent[c], errors='coerce').fillna(0).astype(int)
 
-    # 🔥 순서 변경: 이닝 -> 자책점 -> 투구수
-    return recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '투구수']].reset_index(drop=True)
+    # 🔥 이닝 -> 자책점 -> 투구수 -> 휴식일 순서로 배출!
+    return recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '투구수', '휴식일']].reset_index(drop=True)
