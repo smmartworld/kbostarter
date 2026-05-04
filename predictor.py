@@ -32,16 +32,25 @@ def predict_starter(df, team, target_date):
     rotation_pitchers = [p for p in rotation_pitchers if p != '-'][:6] 
 
     rot_data = []
+    
+    # 🔥 수정된 핵심 로직: "현재 팀이 소화한 마지막 경기 날짜" 구하기
+    # 이걸 기준으로 너무 옛날에 던지고 안 나오는 애들(2군행)을 걸러낼 거야!
+    last_team_game = past_df['날짜'].max()
+
     for p in rotation_pitchers:
         p_games = past_df[past_df['선발투수'] == p].sort_values('날짜')
         if not p_games.empty:
             last_game_dt = p_games.iloc[-1]['날짜']
             rest_days = max(0, (target_dt - last_game_dt).days - 1)
             
-            # 🔥 9일 룰 적용 (선발 로테이션 배제)
-            # 휴식일이 9일 이상이고, 그 선수가 오늘 '오피셜 선발'로 뜬 게 아니라면 목록에서 제외!
-            if rest_days >= 9 and p != official_starter:
-                continue
+            # 🔥 9일 룰 (스마트 버전)
+            # 타겟 날짜(내가 누른 날) 기준 휴식일이 아니라, 
+            # "팀이 마지막으로 경기를 한 날짜" 기준으로 9일 이상 안 나왔으면 2군 간 걸로 간주!
+            # (단, 오피셜 선발로 지정된 사람은 예외!)
+            if pd.notna(last_team_game):
+                days_since_last_appearance = (last_team_game - last_game_dt).days
+                if days_since_last_appearance >= 9 and p != official_starter:
+                    continue # 2군 간 걸로 판단하고 후보에서 뺌!
                 
             rot_data.append({'선발투수': p, '최근등판': last_game_dt, '휴식일': rest_days})
             
