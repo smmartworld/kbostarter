@@ -17,11 +17,24 @@ st.markdown("""
     .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 1200px; }
     .stApp { background: #ffffff; }
     .main-title { text-align: center; font-size: 2rem; font-weight: 900; color: #1a202c; margin-bottom: 2px; }
+    
+    /* 🚑 모바일 심폐소생술: 달력 가로 스크롤 (스와이프) 강제 적용! */
     .cal-wrap { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; }
+    @media (max-width: 768px) {
+        .block-container { padding-left: 0.2rem; padding-right: 0.2rem; }
+        .cal-wrap { overflow-x: auto; padding: 10px; }
+        /* 7일치 달력이 밑으로 안 떨어지게 강제 묶기 */
+        .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 550px !important; }
+        .cal-wrap div[data-testid="column"] { min-width: 75px !important; width: 14% !important; flex: 1 1 auto !important; }
+        /* 버튼 텍스트가 안 잘리도록 여백 다이어트 */
+        div[data-testid="stButton"] button { padding: 0.2rem 0 !important; font-size: 0.75rem; }
+    }
+
     .cal-nav-title { text-align: center; font-size: 1.15rem; font-weight: 800; color: #2d3748; padding: 4px 0; }
     .cal-day-name { text-align: center; font-size: 0.78rem; font-weight: 700; color: #718096; padding: 8px 0 4px 0; }
     .cal-empty { height: 36px; }
     .cal-noGame { text-align: center; padding: 6px 0; font-size: 0.88rem; color: #cbd5e0; height: 36px; }
+    
     .match-card { background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px 8px; text-align: center; margin-bottom: 4px; min-height: 100px; }
     .match-card.sel { background: #ebf8ff; border-color: #4299e1; }
     .mc-teams { font-size: 0.88rem; font-weight: 700; color: #2d3748; margin-top: 4px; }
@@ -35,7 +48,9 @@ st.markdown("""
     .sec-label { font-size: 0.72rem; font-weight: 800; color: #a0aec0; margin: 12px 0 5px 0; }
     .score-banner { background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 10px; padding: 10px 20px; text-align: center; font-size: 1.35rem; font-weight: 800; color: #276749; margin: 8px 0 16px 0; }
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
-    .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; }
+    
+    /* 스탯 뱃지 줄바꿈 방지 */
+    .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     .css-logo { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .css-logo-large { width: 50px; height: 50px; font-size: 1.1rem; }
 </style>
@@ -66,7 +81,7 @@ st.markdown('<div class="main-title">⚾ KBO 선발 예측기</div>', unsafe_all
 
 col_a, col_b, col_c = st.columns([1, 2, 1])
 with col_b:
-    st.session_state.my_team = st.selectbox("📣 나의 응원팀 (달력에 승패와 홈/원정이 표시됩니다!)", list(TEAM_COLORS.keys()), index=list(TEAM_COLORS.keys()).index(st.session_state.my_team))
+    st.session_state.my_team = st.selectbox("📣 나의 응원팀", list(TEAM_COLORS.keys()), index=list(TEAM_COLORS.keys()).index(st.session_state.my_team))
 
 working_df = original_df.copy()
 for (team, dt_str), pitcher in st.session_state.overrides.items():
@@ -97,7 +112,6 @@ day_names = ['월', '화', '수', '목', '금', '토', '일']
 hcols = st.columns(7)
 for i, d in enumerate(day_names): hcols[i].markdown(f'<div class="cal-day-name">{d}</div>', unsafe_allow_html=True)
 
-# 💡 내 응원팀의 모든 경기 스케줄을 미리 쫙 뽑아두기 (연전 분석용)
 my_all_games = working_df[((working_df['팀'] == st.session_state.my_team) | (working_df['상대팀'] == st.session_state.my_team)) & (working_df['구장'] == '원정')].copy()
 my_all_games = my_all_games.sort_values('날짜')
 
@@ -113,7 +127,6 @@ for week in cal_module.monthcalendar(year, month):
                 day_pd = pd.to_datetime(date(year, month, day))
                 
                 my_day_game = my_all_games[my_all_games['날짜'] == day_pd]
-                
                 btn_label = str(day)
                 
                 if not my_day_game.empty:
@@ -130,36 +143,28 @@ for week in cal_module.monthcalendar(year, month):
                             elif my_s < opp_s: btn_label = f"{day} 🔴" 
                             else: btn_label = f"{day} 🟢" 
                         except: btn_label = f"{day} ✅"
-                    elif g_status == '우천취소': btn_label = f"{day} ⚪" # 💡 3. 우취 회색 동그라미!
+                    elif g_status == '우천취소': btn_label = f"{day} ⚪"
                     
-                    # 💡 2. 스마트 연전 시작 판별기! (어제 경기가 없었거나, 어제랑 상대팀/구장이 다르면 새로운 시리즈!)
                     yesterday_pd = day_pd - timedelta(days=1)
                     yesterday_game = my_all_games[my_all_games['날짜'] == yesterday_pd]
                     
                     is_new_series = False
-                    if yesterday_game.empty:
-                        is_new_series = True
+                    if yesterday_game.empty: is_new_series = True
                     else:
                         y_r = yesterday_game.iloc[0]
                         y_is_away = (y_r['팀'] == st.session_state.my_team)
                         y_opp_team = y_r['상대팀'] if y_is_away else y_r['팀']
-                        if (y_opp_team != opp_team) or (y_is_away != is_away):
-                            is_new_series = True
+                        if (y_opp_team != opp_team) or (y_is_away != is_away): is_new_series = True
                     
                     if is_new_series:
-                        # 💡 1. 홈구장 꼬임 완벽 해결! 내가 원정이면 상대구장, 내가 홈이면 내구장!
                         stadium = STADIUMS.get(opp_team) if is_away else STADIUMS.get(st.session_state.my_team)
                         stadium_str = stadium if stadium else "?"
-                        if is_away:
-                            btn_label += f"\n(원정,{stadium_str})"
-                        else:
-                            btn_label += f"\n(홈,{stadium_str})"
+                        btn_label += f"\n(원정,{stadium_str})" if is_away else f"\n(홈,{stadium_str})"
 
                 if st.button(btn_label, key=f"cd_{year}_{month}_{day}", type="primary" if is_sel else "secondary", use_container_width=True):
                     st.session_state.selected_date = date(year, month, day)
                     st.session_state.pitcher_away = None 
                     st.session_state.pitcher_home = None 
-                    
                     if not my_day_game.empty:
                         r = my_day_game.iloc[0]
                         st.session_state.selected_game = {'away': r['팀'], 'home': r['상대팀'], 'status': r['상태'], 'away_score': r['득점'], 'home_score': r['실점']}
@@ -167,7 +172,6 @@ for week in cal_module.monthcalendar(year, month):
                         st.session_state.selected_game = None
                     st.rerun()
             else: 
-                # 💡 3. 경기가 아예 없는 야없날(월요일 등)도 회색 동그라미 통일!
                 st.markdown(f'<div class="cal-noGame">{day} ⚪</div>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -308,6 +312,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         if not rot_list.empty: st.dataframe(rot_list, hide_index=True, use_container_width=True)
 
+# 모바일에서는 양팀 패널이 위아래로 쌓이도록 (기본 Streamlit 동작 유지)
 render_team_panel(left_col, away_team, 'pitcher_away', is_away=True)
 render_team_panel(right_col, home_team, 'pitcher_home', is_away=False)
 
