@@ -49,6 +49,9 @@ st.markdown("""
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
+    
+    /* 💡 버튼 내 텍스트 줄바꿈 유지 (CSS) */
+    div[data-testid="stButton"] button p { white-space: pre-wrap; line-height: 1.3; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -280,7 +283,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             st.markdown(f'<span class="stat-badge">이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">자책점 <b>{r["자책점"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
             show_pitcher = r["선발투수"] 
         else:
-            # 💡 is_official 반환값 추가받기!
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt)
             
             if rotation_df.empty: 
@@ -301,13 +303,15 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     pname = rot_row['선발투수']
                     with btn_cols[j]:
                         is_active = (show_pitcher == pname)
-                        # 🔥 오피셜 선발이면 "✅ 확정!", 아니면 "🎯 예측"으로 동적 변경!
-                        if pname == predicted:
-                            mark = "✅ 확정\n" if is_official else "🎯 예측\n"
+                        
+                        # 🔥 버튼 디자인 완벽 통일! 
+                        # 오피셜이면 3줄(✅오피셜, 이름, 휴식일), 아니면 빈칸 넣어서 3줄(\n, 이름, 휴식일)
+                        if pname == predicted and is_official:
+                            btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
-                            mark = ""
+                            btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                             
-                        if st.button(f"{mark}{pname}\n({rot_row['휴식일']}일)", key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
+                        if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
                             st.session_state[pitcher_key] = pname; st.rerun()
 
         if show_pitcher and show_pitcher != '-':
@@ -324,8 +328,22 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             recent = get_pitcher_recent_stats(working_df, show_pitcher, selected_dt, n=5)
             
             if not recent.empty: 
-                styled_recent = recent.style.set_properties(**{'text-align': 'right'})
-                st.dataframe(styled_recent, hide_index=True, use_container_width=True)
+                # 🔥 Streamlit column_config를 사용해서 표의 모든 데이터 우측 정렬 강제 적용!
+                st.dataframe(
+                    recent, 
+                    hide_index=True, 
+                    use_container_width=True,
+                    column_config={
+                        "날짜": st.column_config.TextColumn("날짜", alignment="right"),
+                        "상대팀": st.column_config.TextColumn("상대팀", alignment="right"),
+                        "이닝": st.column_config.TextColumn("이닝", alignment="right"),
+                        "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="right"),
+                        "피안타": st.column_config.NumberColumn("피안타", format="%d", alignment="right"),
+                        "사사구": st.column_config.NumberColumn("사사구", format="%d", alignment="right"),
+                        "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="right"),
+                        "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="right")
+                    }
+                )
             else: 
                 st.caption("최근 경기 기록 없음")
 
@@ -334,8 +352,21 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         
         if not rot_list.empty: 
-            styled_rot = rot_list.style.set_properties(**{'text-align': 'right'})
-            st.dataframe(styled_rot, hide_index=True, use_container_width=True)
+            # 🔥 로테이션 표도 동일하게 우측 정렬 강제 적용!
+            st.dataframe(
+                rot_list, 
+                hide_index=True, 
+                use_container_width=True,
+                column_config={
+                    "날짜": st.column_config.TextColumn("날짜", alignment="right"),
+                    "상대팀": st.column_config.TextColumn("상대팀", alignment="right"),
+                    "선발투수": st.column_config.TextColumn("선발투수", alignment="right"),
+                    "이닝": st.column_config.TextColumn("이닝", alignment="right"),
+                    "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="right"),
+                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="right"),
+                    "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="right")
+                }
+            )
 
 render_team_panel(left_col, away_team, 'pitcher_away', is_away=True)
 render_team_panel(right_col, home_team, 'pitcher_home', is_away=False)
