@@ -1,42 +1,40 @@
 name: KBO Data Auto Update
 
-# 1. 언제 이 로봇이 실행될까? (매일 한국시간 오후 11시 30분)
 on:
   schedule:
-    # 한국 시간 밤 11시 30분 = UTC 시간 오후 2시 30분
     - cron: '30 14 * * *' 
-  workflow_dispatch:
+  workflow_dispatch: 
 
 jobs:
   update-kbo-data:
-    runs-on: ubuntu-latest # 로봇이 쓸 가상 컴퓨터 운영체제
+    runs-on: ubuntu-latest 
 
     steps:
-    # 1. 내 깃허브 창고에서 파일 가져오기
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # 모든 기록 가져오기 (충돌 방지)
 
-    # 2. 파이썬 설치하기
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.10' # 파이썬 버전 지정
+        python-version: '3.10'
 
-    # 3. 필요한 라이브러리(requests 등) 설치
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas
+        pip install requests pandas beautifulsoup4
 
-    # 4. 크롤러 파이썬 파일 실행!!! (여기서 CSV가 새로 만들어짐)
     - name: Run data crawler
       run: python data.py
 
-    # 5. 새로 만들어진 CSV 파일을 내 깃허브 창고에 덮어쓰기! (Commit & Push)
     - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
+        
+        # 🔥 충돌 방지를 위해 먼저 최신 상태 땡겨오기
+        git pull origin main --rebase
+        
         git add 로테이션_마스터데이터.csv
-        # 변경된 사항이 없으면 에러 내지 말고 조용히 넘어가기
-        git diff --quiet && git diff --staged --quiet || (git commit -m "⚾ 매일 아침 KBO 데이터 자동 업데이트 완료!" && git push)
+        git diff --quiet && git diff --staged --quiet || (git commit -m "⚾ 매일 KBO 데이터 자동 업데이트 완료!" && git push origin HEAD:main)
