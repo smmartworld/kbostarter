@@ -1,4 +1,5 @@
 import pandas as pd
+from datetime import timedelta
 
 TEAM_COLORS = {
     'KIA': '#EA0029', '삼성': '#074CA1', 'LG': '#C30452', '두산': '#131230', 
@@ -15,6 +16,7 @@ def get_active_rotation(df, team, target_date):
 def predict_starter(df, team, target_date):
     target_dt = pd.to_datetime(target_date)
     
+    # 💡 1. 오피셜 선발 감지 (최우선)
     official_row = df[(df['날짜'] == target_dt) & (df['팀'] == team) & (df['상태'] == '예정') & (df['선발투수'] != '-')].copy()
     is_official = False
     if not official_row.empty:
@@ -27,40 +29,65 @@ def predict_starter(df, team, target_date):
     if past_df.empty: 
         return (official_starter if official_starter else "데이터 부족"), pd.DataFrame(), is_official
 
+    # 💡 2. 최근 15경기를 통해 현재 '진짜' 로테이션 멤버 5~6명 추출
     recent_games = past_df.sort_values('날짜', ascending=False).head(15)
-    rotation_pitchers = recent_games['선발투수'].dropna().unique()
-    rotation_pitchers = [p for p in rotation_pitchers if p != '-'][:6] 
-
-    rot_data = []
+    recent_pitchers_raw = recent_games['선발투수'].dropna().unique()
     
-    # 🔥 수정된 핵심 로직: "현재 팀이 소화한 마지막 경기 날짜" 구하기
-    # 이걸 기준으로 너무 옛날에 던지고 안 나오는 애들(2군행)을 걸러낼 거야!
+    active_rotation = []
     last_team_game = past_df['날짜'].max()
 
-    for p in rotation_pitchers:
+    # 🔥 9일 룰: 최근 9일 이상 등판 기록이 없는 선수는 로테이션에서 배제 (오피셜 예외)
+    for p in recent_pitchers_raw:
+        if p == '-': continue
+        p_last_game = past_df[past_df['선발투수'] == p]['날짜'].max()
+        if pd.notna(last_team_game) and pd.notna(p_last_game):
+            if (last_team_game - p_last_game).days >= 9 and p != official_starter:
+                continue 
+        active_rotation.append(p)
+        if len(active_rotation) == 6: break # 최대 6선발까지만 관리
+
+    if not active_rotation: 
+        return (official_starter if official_starter else "예측 불가"), pd.DataFrame(), is_official
+
+    # 💡 3. 로테이션 멤버들의 휴식일 및 기본 정보 세팅 (UI에 뿌려줄 표 만들기 용도)
+    rot_data = []
+    for p in active_rotation:
         p_games = past_df[past_df['선발투수'] == p].sort_values('날짜')
         if not p_games.empty:
             last_game_dt = p_games.iloc[-1]['날짜']
             rest_days = max(0, (target_dt - last_game_dt).days - 1)
-            
-            # 🔥 9일 룰 (스마트 버전)
-            # 타겟 날짜(내가 누른 날) 기준 휴식일이 아니라, 
-            # "팀이 마지막으로 경기를 한 날짜" 기준으로 9일 이상 안 나왔으면 2군 간 걸로 간주!
-            # (단, 오피셜 선발로 지정된 사람은 예외!)
-            if pd.notna(last_team_game):
-                days_since_last_appearance = (last_team_game - last_game_dt).days
-                if days_since_last_appearance >= 9 and p != official_starter:
-                    continue # 2군 간 걸로 판단하고 후보에서 뺌!
-                
             rot_data.append({'선발투수': p, '최근등판': last_game_dt, '휴식일': rest_days})
             
-    if not rot_data: return (official_starter if official_starter else "예측 불가"), pd.DataFrame(), is_official
-    
     rot_df = pd.DataFrame(rot_data)
     rot_df = rot_df.sort_values('최근등판', ascending=True).reset_index(drop=True)
-    
-    predicted_pitcher = official_starter if official_starter else rot_df.iloc[0]['선발투수']
-    
+
+    # 💡 4. 대망의 예측 시뮬레이션 복구! (1-2-3-4-5 순서대로 돌리기)
+    # 만약 오피셜이 떴다면 시뮬레이션 무시하고 오피셜 리턴!
+    if is_official:
+        predicted_pitcher = official_starter
+    else:
+        # 마지막 경기 날짜부터 타겟 날짜까지 팀의 스케줄을 하나씩 짚어가며 로테이션을 돌려본다.
+        sim_date = last_team_game + timedelta(days=1)
+        sim_rotation_queue = list(rot_df['선발투수']) # [가장 오래 쉰 투수, 두번째..., 최근 던진 투수]
+        
+        # 만약 스케줄상 팀의 경기가 있는 날이면, 큐의 첫 번째 투수가 등판하고 맨 뒤로 이동!
+        while sim_date <= target_dt:
+            # 팀이 그 날짜에 경기가 있는지 확인 (과거 결측치, 미래 스케줄 포함)
+            has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
+            
+            if has_game:
+                current_pitcher = sim_rotation_queue.pop(0) # 오늘 던질 투수 꺼냄
+                if sim_date == target_dt:
+                    predicted_pitcher = current_pitcher
+                    break
+                sim_rotation_queue.append(current_pitcher) # 던졌으니 맨 뒤로 줄 섬
+            
+            sim_date += timedelta(days=1)
+            
+        # 만약 루프를 다 돌았는데도 할당이 안 됐다면(예외), 가장 오래 쉰 투수 배정
+        if 'predicted_pitcher' not in locals():
+            predicted_pitcher = rot_df.iloc[0]['선발투수']
+
     return predicted_pitcher, rot_df[['선발투수', '휴식일']], is_official
 
 def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
