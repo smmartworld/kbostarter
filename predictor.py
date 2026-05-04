@@ -50,8 +50,7 @@ def predict_starter(df, team, target_date):
         
     return predicted, rotation_df
 
-# 성적(스탯)은 진짜로 던진 '종료' 경기만 긁어오도록 유지
-def get_pitcher_recent_stats(df, pitcher_name, target_date, n=3):
+def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5): # n=5 로 변경
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
@@ -62,7 +61,8 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=3):
     for col in ['투구수', '피안타', '사사구', '자책점']:
         recent[col] = pd.to_numeric(recent[col], errors='coerce').fillna(0).astype(int)
 
-    return recent[['날짜', '상대팀', '이닝', '투구수', '피안타', '사사구', '자책점', '휴식일']].reset_index(drop=True)
+    # 🔥 순서 변경: 이닝 -> 자책점 -> 투구수
+    return recent[['날짜', '상대팀', '이닝', '자책점', '투구수', '피안타', '사사구', '휴식일']].reset_index(drop=True)
 
 def get_season_stats(df, pitcher_name, target_date):
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy()
@@ -82,16 +82,14 @@ def get_season_stats(df, pitcher_name, target_date):
     return {'등판': games, 'ERA': era, 'WHIP': whip, '총이닝': round(total_inn, 1)}
 
 def get_recent_rotation_list(df, team, target_date, n=10):
-    # 1. 일단 최신 날짜순(내림차순)으로 정렬해서 가장 최근 10경기를 싹둑 자르기!
     team_df = df[(df['팀'] == team) & (df['상태'].isin(['종료', '수동확정'])) & (df['선발투수'] != '-') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜', ascending=False)
     recent = team_df.head(n).copy()
-    
     if recent.empty: return pd.DataFrame()
 
     recent = recent.sort_values('날짜', ascending=True)
-
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
     for c in ['투구수', '자책점']:
         recent[c] = pd.to_numeric(recent[c], errors='coerce').fillna(0).astype(int)
 
-    return recent[['날짜', '상대팀', '선발투수', '이닝', '투구수', '자책점']].reset_index(drop=True)
+    # 🔥 순서 변경: 이닝 -> 자책점 -> 투구수
+    return recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '투구수']].reset_index(drop=True)
