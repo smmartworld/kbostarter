@@ -50,7 +50,8 @@ def predict_starter(df, team, target_date):
         
     return predicted, rotation_df
 
-def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5): # n=5 로 변경
+
+def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
@@ -61,8 +62,7 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5): # n=5 로 변�
     for col in ['투구수', '피안타', '사사구', '자책점']:
         recent[col] = pd.to_numeric(recent[col], errors='coerce').fillna(0).astype(int)
 
-    # 🔥 순서 변경: 이닝 -> 자책점 -> 투구수
-    return recent[['날짜', '상대팀', '이닝', '자책점', '투구수', '피안타', '사사구', '휴식일']].reset_index(drop=True)
+    return recent[['날짜', '상대팀', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
 
 def get_season_stats(df, pitcher_name, target_date):
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy()

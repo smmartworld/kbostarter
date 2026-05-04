@@ -8,7 +8,7 @@ from predictor import (
     get_recent_rotation_list, TEAM_COLORS
 )
 
-st.set_page_config(page_title="⚾ KBO 로테이션 매니저", page_icon="⚾", layout="wide")
+st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layout="wide")
 
 st.markdown("""
 <style>
@@ -16,7 +16,8 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 1200px; }
     .stApp { background: #ffffff; }
-    .main-title { text-align: center; font-size: 2rem; font-weight: 900; color: #1a202c; margin-bottom: 2px; }
+    
+    .main-title { text-align: center; font-size: 2rem; font-weight: 900; color: #1a202c; margin-bottom: 12px; }
     
     .cal-wrap { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; margin-bottom: 20px; }
     @media (max-width: 768px) {
@@ -40,7 +41,6 @@ st.markdown("""
     .mc-cancel { font-size: 0.78rem; color: #9b2c2c; }
     .mc-manual { font-size: 0.78rem; color: #3182ce; font-weight: 800; }
     
-    /* 🎨 팀 패널 투명도 백그라운드 디자인! */
     .team-panel { border-radius: 14px; padding: 18px 16px; height: 100%; min-width: 350px !important; }
     .team-name-big { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
     .team-label-small { font-size: 0.7rem; font-weight: 700; color: #a0aec0; }
@@ -49,8 +49,6 @@ st.markdown("""
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
-    .css-logo { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .css-logo-large { width: 50px; height: 50px; font-size: 1.1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -76,7 +74,6 @@ for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
 st.markdown('<div class="main-title">⚾ KBO 선발 예측기</div>', unsafe_allow_html=True)
-st.info("💡 모바일에서는 폰을 가로로 눕혀서 보시면 더 편하게 볼 수 있습니다!")
 
 col_a, col_b, col_c = st.columns([1, 2, 1])
 with col_b:
@@ -192,12 +189,17 @@ if not matchups.empty:
             else: status_html = '<div class="mc-plan">⏰ 예정</div>'
             
             c_away, c_home = TEAM_COLORS.get(row['원정팀'], '#000'), TEAM_COLORS.get(row['홈팀'], '#000')
+            
+            away_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['원정팀']}.png"
+            home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
+            fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
+
             st.markdown(f"""
             <div class="{card_cls}">
                 <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
-                    <div class="css-logo" style="background:{c_away};">{row['원정팀']}</div>
+                    <img src="{away_logo}" width="36" style="border-radius: 50%;" onerror="this.onerror=null; this.src='{fallback_logo}'">
                     <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
-                    <div class="css-logo" style="background:{c_home};">{row['홈팀']}</div>
+                    <img src="{home_logo}" width="36" style="border-radius: 50%;" onerror="this.onerror=null; this.src='{fallback_logo}'">
                 </div>
                 <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
                 {status_html}
@@ -229,12 +231,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
     with col:
         color = TEAM_COLORS.get(team, '#4299e1')
         
-        # 🎨 1. 팀 패널 배경색을 팀 컬러로 은은하게! (투명도 10% 정도인 1a 추가)
         st.markdown(f"""
         <div class="team-panel" style="background-color: {color}1a; border: 2px solid {color};">
             <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
-                <!-- 🎨 2. 깃허브에 올린 구단 로고 불러오기! -->
-                <img src="https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{team}.png" width="50" style="border-radius: 50%;" onerror="this.onerror=null; this.src='https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png'">
+                <img src="https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{team}.png" width="55" style="border-radius: 50%;" onerror="this.style.display='none'">
                 <div>
                     <div class="team-label-small">{"원정팀" if is_away else "홈팀"}</div>
                     <div class="team-name-big" style="color:{color};">{team}</div>
@@ -248,12 +248,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if actual_row.empty: st.warning("선발 기록 없음"); return
             r = actual_row.iloc[0]
             st.markdown(f'<div class="sec-label">실제 선발 투수</div><div style="font-size:1.4rem;font-weight:900;">{r["선발투수"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<span class="stat-badge">이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span><span class="stat-badge">자책점 <b>{r["자책점"]}</b></span>', unsafe_allow_html=True)
+            st.markdown(f'<span class="stat-badge">이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">자책점 <b>{r["자책점"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
         else:
             dt_str = selected_dt.strftime('%Y-%m-%d')
             is_overridden = (team, dt_str) in st.session_state.overrides
             
-            use_manual = st.toggle(f"🛠️ 관리자: 오피셜 수동 확정", value=is_overridden, key=f"man_{team}_{dt_str}")
+            use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
             
             if use_manual:
                 current_val = st.session_state.overrides.get((team, dt_str), "")
@@ -287,9 +287,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             show_pitcher = st.session_state[pitcher_key]
 
             if is_overridden:
-                st.info(f"👉 관리자 강제 지정됨: 🎯 {show_pitcher}")
+                st.info(f"👉 수동 지정됨: 🎯 {show_pitcher}")
             else:
-                st.markdown('<div class="sec-label">🎯 로테이션 멤버 선택</div>', unsafe_allow_html=True)
+                # 💡 "선발투수 선택"으로 텍스트 변경
+                st.markdown('<div class="sec-label">🎯 선발투수 선택</div>', unsafe_allow_html=True)
                 btn_cols = st.columns(len(rotation_df))
                 for j, rot_row in rotation_df.iterrows():
                     pname = rot_row['선발투수']
@@ -298,30 +299,14 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         if st.button(f"{'🎯 ' if pname == predicted else ''}{pname}\n({rot_row['휴식일']}일)", key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
                             st.session_state[pitcher_key] = pname; st.rerun()
 
-# 👉 수정할 부분: app.py의 render_team_panel 함수 안쪽 사진 띄우는 곳
-
             if show_pitcher:
-                # 🖼️ 1. 사진 띄우기 (CSV에서 URL 다이렉트로 가져오기)
-                p_row = working_df[working_df['선발투수'] == show_pitcher].tail(1)
-                
-                # pcode 복잡한 처리 다 지우고, 그냥 '선발투수사진' 컬럼값 가져오기
-                img_url = p_row['선발투수사진'].values[0] if not p_row.empty and '선발투수사진' in p_row.columns and pd.notna(p_row['선발투수사진'].values[0]) else ""
-                
-                p_cols = st.columns([1, 3])
-                with p_cols[0]:
-                    if img_url and img_url != '-':
-                        # 만약 엑스박스 뜨면 빈 사람 실루엣 보여주기
-                        fallback_img = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
-                        st.markdown(f'<img src="{img_url}" width="60" style="border-radius:10px; border: 1px solid #e2e8f0;" onerror="this.onerror=null; this.src=\'{fallback_img}\'">', unsafe_allow_html=True)
-                
-                # 📊 2. WHIP 포함된 스탯 띄우기
-                with p_cols[1]:
-                    s = get_season_stats(working_df, show_pitcher, selected_dt)
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
-                    if 'WHIP' in s:
-                        st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
-                    else:
-                         st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                s = get_season_stats(working_df, show_pitcher, selected_dt)
+                st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+                if 'WHIP' in s:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
             st.markdown(f"**📊 {show_pitcher} 최근 5경기 상세 성적**") 
@@ -334,7 +319,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 st.caption("최근 경기 기록 없음")
 
         st.divider()
-        st.markdown(f"**🔄 {team} 최근 로테이션 흐름 (수동확정 포함)**")
+        st.markdown(f"**🔄 {team} 최근 선발로테 2바퀴**")
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         
         if not rot_list.empty: 
@@ -345,4 +330,4 @@ render_team_panel(left_col, away_team, 'pitcher_away', is_away=True)
 render_team_panel(right_col, home_team, 'pitcher_home', is_away=False)
 
 st.divider()
-st.markdown('<div style="text-align:center; color:#a0aec0; font-size:0.78rem;">⚾ KBO 로테이션 매니저 &nbsp;|&nbsp; 데이터: KBO 공식 / 네이버 스포츠</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color:#a0aec0; font-size:0.78rem;">⚾ KBO 선발 예측기 &nbsp;|&nbsp; 데이터: KBO 공식 / 네이버 스포츠</div>', unsafe_allow_html=True)
