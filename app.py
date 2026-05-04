@@ -223,7 +223,7 @@ if status == '종료':
 elif status == '우천취소':
     st.error(f"☔ {away_team} vs {home_team} — 우천취소된 경기입니다."); st.stop()
 else:
-    st.markdown(f'<div class="score-banner upcoming">⏰ {away_team} vs {home_team} — 선발 예측 모드</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="score-banner upcoming">⏰ {away_team} vs {home_team} — 선발 투수 프리뷰</div>', unsafe_allow_html=True)
 
 left_col, right_col = st.columns(2)
 
@@ -243,43 +243,49 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        dt_str = selected_dt.strftime('%Y-%m-%d')
+        is_overridden = (team, dt_str) in st.session_state.overrides
+        use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
+        
+        if use_manual:
+            current_val = st.session_state.overrides.get((team, dt_str), "")
+            c1, c2, c3 = st.columns([5, 2, 2])
+            with c1:
+                manual_p = st.text_input("투수 이름", value=current_val, key=f"inp_{team}_{dt_str}", label_visibility="collapsed")
+            with c2:
+                if st.button("적용", key=f"apply_{team}_{dt_str}", use_container_width=True):
+                    if manual_p:
+                        st.session_state.overrides[(team, dt_str)] = manual_p.strip()
+                        st.session_state[pitcher_key] = manual_p.strip() 
+                        st.rerun()
+            with c3:
+                if st.button("초기화", key=f"clear_{team}_{dt_str}", use_container_width=True):
+                    if is_overridden:
+                        del st.session_state.overrides[(team, dt_str)]
+                        st.session_state[pitcher_key] = None
+                        st.rerun()
+        else:
+            if is_overridden:
+                del st.session_state.overrides[(team, dt_str)]
+                st.session_state[pitcher_key] = None
+                st.rerun()
+
         if status == '종료':
             actual_row = working_df[(working_df['날짜'] == selected_dt) & (working_df['팀'] == team) & (working_df['상태'] == '종료')]
-            if actual_row.empty: st.warning("선발 기록 없음"); return
+            if actual_row.empty: 
+                st.warning("선발 기록 없음")
+                return
             r = actual_row.iloc[0]
             st.markdown(f'<div class="sec-label">실제 선발 투수</div><div style="font-size:1.4rem;font-weight:900;">{r["선발투수"]}</div>', unsafe_allow_html=True)
             st.markdown(f'<span class="stat-badge">이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">자책점 <b>{r["자책점"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
+            show_pitcher = r["선발투수"] 
         else:
-            dt_str = selected_dt.strftime('%Y-%m-%d')
-            is_overridden = (team, dt_str) in st.session_state.overrides
+            # 💡 is_official 반환값 추가받기!
+            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt)
             
-            use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
-            
-            if use_manual:
-                current_val = st.session_state.overrides.get((team, dt_str), "")
-                c1, c2, c3 = st.columns([5, 2, 2])
-                with c1:
-                    manual_p = st.text_input("투수 이름", value=current_val, key=f"inp_{team}_{dt_str}", label_visibility="collapsed")
-                with c2:
-                    if st.button("적용", key=f"apply_{team}_{dt_str}", use_container_width=True):
-                        if manual_p:
-                            st.session_state.overrides[(team, dt_str)] = manual_p.strip()
-                            st.session_state[pitcher_key] = manual_p.strip() 
-                            st.rerun()
-                with c3:
-                    if st.button("초기화", key=f"clear_{team}_{dt_str}", use_container_width=True):
-                        if is_overridden:
-                            del st.session_state.overrides[(team, dt_str)]
-                            st.session_state[pitcher_key] = None
-                            st.rerun()
-            else:
-                if is_overridden:
-                    del st.session_state.overrides[(team, dt_str)]
-                    st.session_state[pitcher_key] = None
-                    st.rerun()
-
-            predicted, rotation_df = predict_starter(working_df, team, selected_dt)
-            if rotation_df.empty: st.warning("데이터 부족"); return
+            if rotation_df.empty: 
+                st.warning("데이터 부족")
+                return
 
             if st.session_state[pitcher_key] is None:
                 st.session_state[pitcher_key] = st.session_state.overrides.get((team, dt_str), predicted)
@@ -289,23 +295,28 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if is_overridden:
                 st.info(f"👉 수동 지정됨: 🎯 {show_pitcher}")
             else:
-                # 💡 "선발투수 선택"으로 텍스트 변경
                 st.markdown('<div class="sec-label">🎯 선발투수 선택</div>', unsafe_allow_html=True)
                 btn_cols = st.columns(len(rotation_df))
                 for j, rot_row in rotation_df.iterrows():
                     pname = rot_row['선발투수']
                     with btn_cols[j]:
                         is_active = (show_pitcher == pname)
-                        if st.button(f"{'🎯 ' if pname == predicted else ''}{pname}\n({rot_row['휴식일']}일)", key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
+                        # 🔥 오피셜 선발이면 "✅ 확정!", 아니면 "🎯 예측"으로 동적 변경!
+                        if pname == predicted:
+                            mark = "✅ 확정\n" if is_official else "🎯 예측\n"
+                        else:
+                            mark = ""
+                            
+                        if st.button(f"{mark}{pname}\n({rot_row['휴식일']}일)", key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
                             st.session_state[pitcher_key] = pname; st.rerun()
 
-            if show_pitcher:
-                s = get_season_stats(working_df, show_pitcher, selected_dt)
-                st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
-                if 'WHIP' in s:
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+        if show_pitcher and show_pitcher != '-':
+            s = get_season_stats(working_df, show_pitcher, selected_dt)
+            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+            if 'WHIP' in s:
+                st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
