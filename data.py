@@ -14,8 +14,8 @@ def master_collector_v5():
 
     with open('로테이션_마스터데이터.csv', 'w', encoding='utf-8-sig', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['날짜', '팀', '상대팀', '구장', '상태', '득점', '실점', '선발투수', '이닝', '투구수', '피안타', '사사구', '자책점'])
-
+        writer.writerow(['날짜', '팀', '상대팀', '구장', '상태', '득점', '실점', '선발투수', 'pcode', '이닝', '투구수', '피안타', '사사구', '자책점'])
+        
         for month in [f"{i:02d}" for i in range(3, 11)]:
             kbo_url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
             payload = {'leId': '1', 'srIdList': '0,9', 'seasonId': '2026', 'gameMonth': month, 'teamId': ''}
@@ -82,19 +82,20 @@ def master_collector_v5():
                                     if pitchers.get('away') and pitchers.get('home'):
                                         def get_stats(p):
                                             name = p.get('name', '')
+                                            pcode = p.get('pcode', '') 
                                             inn = p.get('inn', '0')
-                                            # 💡 핵심 수정: 네이버 API의 투구수 키값은 'bf' 였습니다!
                                             np = p.get('bf', '0') 
                                             hit = p.get('hit', '0')
                                             sasa = str(int(p.get('bb', 0)) + int(p.get('hp', 0))) 
                                             er = p.get('er', '0')
-                                            return name, inn, np, hit, sasa, er
+                                            return name, pcode, inn, np, hit, sasa, er
 
-                                        a_name, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(pitchers['away'][0])
-                                        h_name, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(pitchers['home'][0])
+                                        a_name, a_pcode, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(pitchers['away'][0])
+                                        h_name, h_pcode, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(pitchers['home'][0])
                                         
-                                        writer.writerow([current_date_str, away_team, home_team, '원정', status, away_score, home_score, a_name, a_inn, a_np, a_hit, a_sasa, a_er])
-                                        writer.writerow([current_date_str, home_team, away_team, '홈', status, home_score, away_score, h_name, h_inn, h_np, h_hit, h_sasa, h_er])
+                                        # pcode를 포함해서 writerow 저장!
+                                        writer.writerow([current_date_str, away_team, home_team, '원정', status, away_score, home_score, a_name, a_pcode, a_inn, a_np, a_hit, a_sasa, a_er])
+                                        writer.writerow([current_date_str, home_team, away_team, '홈', status, home_score, away_score, h_name, h_pcode, h_inn, h_np, h_hit, h_sasa, h_er])
                                         
                                         print(f"⚾ {current_date_str} | {away_team}({a_name}, {a_np}구) vs {home_team}({h_name}, {h_np}구) 저장 완료!")
                                         is_saved = True

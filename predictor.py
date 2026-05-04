@@ -66,13 +66,20 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=3):
 
 def get_season_stats(df, pitcher_name, target_date):
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy()
-    if pitcher_df.empty: return {'등판': 0, 'ERA': '-', '총이닝': 0}
+    if pitcher_df.empty: return {'등판': 0, 'ERA': '-', 'WHIP': '-', '총이닝': 0} # WHIP 빈값 추가
 
     games = len(pitcher_df)
     total_inn = pitcher_df['이닝'].apply(parse_innings).sum()
     total_er = pd.to_numeric(pitcher_df['자책점'], errors='coerce').fillna(0).sum()
+    
+    # 🔥 WHIP 계산 추가!
+    total_hit = pd.to_numeric(pitcher_df['피안타'], errors='coerce').fillna(0).sum()
+    total_sasa = pd.to_numeric(pitcher_df['사사구'], errors='coerce').fillna(0).sum()
+    
     era = round(total_er / total_inn * 9, 2) if total_inn > 0 else '-'
-    return {'등판': games, 'ERA': era, '총이닝': round(total_inn, 1)}
+    whip = round((total_hit + total_sasa) / total_inn, 2) if total_inn > 0 else '-'
+    
+    return {'등판': games, 'ERA': era, 'WHIP': whip, '총이닝': round(total_inn, 1)}
 
 def get_recent_rotation_list(df, team, target_date, n=10):
     # 1. 일단 최신 날짜순(내림차순)으로 정렬해서 가장 최근 10경기를 싹둑 자르기!
