@@ -3,8 +3,9 @@ name: KBO Data Auto Update
 # 1. 언제 이 로봇이 실행될까? (매일 한국시간 오후 11시 30분)
 on:
   schedule:
-    - cron: '30 14 * * *' # UTC 기준 2시 30분 = 한국 시간 오후 11시 30분
-  workflow_dispatch: # 버튼 눌러서 수동 실행 가능하게!
+    # 한국 시간 밤 11시 30분 = UTC 시간 오후 2시 30분
+    - cron: '30 14 * * *' 
+  workflow_dispatch:
 
 jobs:
   update-kbo-data:
