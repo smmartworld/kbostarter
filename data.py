@@ -76,7 +76,7 @@ def master_collector_v13():
                         headers = {'User-Agent': 'Mozilla/5.0'}
                         
                         try:
-                            time.sleep(0.3) 
+                            time.sleep(0.1) 
                             base_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}"
                             base_res = requests.get(base_url, headers=headers, timeout=5)
                             
