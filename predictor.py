@@ -16,7 +16,6 @@ def get_active_rotation(df, team, target_date):
 def predict_starter(df, team, target_date):
     target_dt = pd.to_datetime(target_date)
     
-    # 💡 [NEW] KBO 오피셜 선발 감지
     official_row = df[(df['날짜'] == target_dt) & (df['팀'] == team) & (df['상태'] == '예정') & (df['선발투수'] != '-')].copy()
     is_official = False
     if not official_row.empty:
@@ -41,7 +40,6 @@ def predict_starter(df, team, target_date):
         if not p_games.empty:
             last_game_dt = p_games.iloc[-1]['날짜']
             
-            # 스마트 9일 룰 (오피셜로 뜬 선수는 예외)
             if pd.notna(last_team_game):
                 days_since_last_appearance = (last_team_game - last_game_dt).days
                 if days_since_last_appearance >= 9 and p != official_starter:
@@ -55,7 +53,6 @@ def predict_starter(df, team, target_date):
     rot_df = pd.DataFrame(rot_data)
     rot_df = rot_df.sort_values('최근등판', ascending=True).reset_index(drop=True)
     
-    # 💡 [NEW] 오피셜이 있으면 시뮬레이션 패스! 없으면 시뮬레이션 돌림!
     if is_official:
         predicted_pitcher = official_starter
     else:
@@ -64,14 +61,12 @@ def predict_starter(df, team, target_date):
         
         while sim_date <= target_dt:
             has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
-            
             if has_game:
                 current_pitcher = sim_rotation_queue.pop(0)
                 if sim_date == target_dt:
                     predicted_pitcher = current_pitcher
                     break
                 sim_rotation_queue.append(current_pitcher)
-            
             sim_date += timedelta(days=1)
             
         if 'predicted_pitcher' not in locals():
@@ -104,15 +99,26 @@ def get_season_stats(df, pitcher_name, target_date):
     def parse_inning(inn_str):
         try:
             inn_str = str(inn_str).strip()
-            if ' ' in inn_str:
-                whole, frac = inn_str.split(' ')
-                num, den = frac.split('/')
-                return float(whole) + (float(num) / float(den))
+            if not inn_str or inn_str == '-': return 0.0
+            
+            # 🔥 네이버 유니코드 분수(⅓, ⅔) 완벽 방어!
+            inn_str = inn_str.replace('⅓', ' 1/3').replace('⅔', ' 2/3').strip()
+            
+            parts = inn_str.split()
+            if len(parts) == 2:
+                whole = float(parts[0])
+                num, den = parts[1].split('/')
+                return whole + (float(num) / float(den))
             elif '/' in inn_str:
                 num, den = inn_str.split('/')
                 return float(num) / float(den)
             else:
-                return float(inn_str)
+                val = float(inn_str)
+                whole = int(val)
+                rem = round(val - whole, 2)
+                if rem == 0.1: return whole + 1/3
+                elif rem == 0.2: return whole + 2/3
+                return val
         except:
             return 0.0
 
@@ -123,8 +129,10 @@ def get_season_stats(df, pitcher_name, target_date):
 
     whole_innings = int(total_innings_float)
     remainder = total_innings_float - whole_innings
-    if remainder > 0.6: frac_str = " 2/3"
-    elif remainder > 0.3: frac_str = " 1/3"
+    
+    # 🔥 출력할 때도 깔끔한 유니코드로 변경
+    if remainder > 0.6: frac_str = " ⅔"
+    elif remainder > 0.3: frac_str = " ⅓"
     else: frac_str = ""
     display_innings = f"{whole_innings}{frac_str}"
 
