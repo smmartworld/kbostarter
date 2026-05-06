@@ -152,7 +152,11 @@ for week in cal_module.monthcalendar(year, month):
                             elif my_s < opp_s: btn_label = f"{day} 🔴" 
                             else: btn_label = f"{day} 🟢" 
                         except: btn_label = f"{day} ✅"
-                    elif g_status == '우천취소': btn_label = f"{day} ⚪"
+                    elif g_status == '우천취소': 
+                        btn_label = f"{day} ⚪"
+                    # 🔥 [NEW] 미래 경기인데 선발투수 이름이 있다면 오피셜 도장 ✅!
+                    elif str(r['선발투수']) != '-':
+                        btn_label = f"{day} ✅"
                     
                     yesterday_pd = day_pd - timedelta(days=1)
                     yesterday_game = my_all_games[my_all_games['날짜'] == yesterday_pd]
@@ -310,7 +314,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     with btn_cols[j]:
                         is_active = (show_pitcher == pname)
                         
-                        # 🔥 4단계 업그레이드: 괄호 빼고 "🎯 예상" 으로 텍스트 변경
                         if pname == predicted:
                             if is_official:
                                 btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
@@ -336,7 +339,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             recent = get_pitcher_recent_stats(working_df, show_pitcher, selected_dt, n=5)
             
             if not recent.empty: 
-                # 🔥 4단계 업그레이드: 표 모든 데이터 중앙 정렬(center) 강제 적용!
                 st.dataframe(
                     recent, 
                     hide_index=True, 
@@ -360,7 +362,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         rot_list = get_recent_rotation_list(working_df, team, selected_dt, n=10)
         
         if not rot_list.empty: 
-            # 🔥 4단계 업그레이드: 로테이션 표도 동일하게 중앙 정렬(center) 강제 적용!
             st.dataframe(
                 rot_list, 
                 hide_index=True, 
