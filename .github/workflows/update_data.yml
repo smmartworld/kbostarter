@@ -2,7 +2,7 @@ name: KBO Data Auto Update
 
 on:
   schedule:
-    - cron: '30 14 * * *' 
+    - cron: '00 14 * * *' 
   workflow_dispatch: 
 
 jobs:
