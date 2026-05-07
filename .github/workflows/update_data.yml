@@ -2,8 +2,10 @@ name: KBO Data Auto Update
 
 on:
   schedule:
-    - cron: '00 14 * * *' 
-  workflow_dispatch: 
+    # 매 2시간마다 17분에 실행 (예: 00:17, 02:17, 04:17 ...)
+    - cron: '56 */2 * * *'
+    
+  workflow_dispatch:
 
 jobs:
   update-kbo-data:
