@@ -41,7 +41,6 @@ st.markdown("""
     .mc-cancel { font-size: 0.78rem; color: #9b2c2c; }
     .mc-manual { font-size: 0.78rem; color: #3182ce; font-weight: 800; }
     
-    /* 🔥 [NEW] 로고 크기 강제 고정용 CSS */
     .mc-logo-wrap {
         display: inline-flex;
         justify-content: center;
@@ -50,13 +49,9 @@ st.markdown("""
         height: 36px;
         border-radius: 50%;
         overflow: hidden;
-        background-color: white; /* 투명 배경 로고를 위한 흰색 바탕 */
+        background-color: white; 
     }
-    .mc-logo-wrap img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain; /* 찌그러지지 않게 꽉 차게 */
-    }
+    .mc-logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
     
     .team-panel { border-radius: 14px; padding: 18px 16px; height: 100%; min-width: 350px !important; }
     .team-name-big { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
@@ -67,23 +62,12 @@ st.markdown("""
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     
-    div[data-testid="stButton"] button {
-        height: auto !important;
-        min-height: 75px !important; 
-        padding: 6px 2px !important;
-    }
-    div[data-testid="stButton"] button p {
-        white-space: pre-wrap !important; 
-        word-break: keep-all !important;  
-        line-height: 1.4 !important;      
-        font-size: 0.85rem !important;    
-    }
+    div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
+    div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
+    .nav-button-container div[data-testid="stButton"] button { min-height: 40px !important; padding: 4px 8px !important; }
     
-    /* 🔥 [NEW] 이전/다음 화살표 버튼용 작은 사이즈 CSS (예측 버튼과 차별화) */
-    .nav-button-container div[data-testid="stButton"] button {
-        min-height: 40px !important;
-        padding: 4px 8px !important;
-    }
+    /* 결장자 리스트 스타일 */
+    .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,7 +88,8 @@ except FileNotFoundError:
     st.error("❌ 데이터 파일 없음. data.py 먼저 실행 필요.")
     st.stop()
 
-_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}}
+# 🔥 [NEW] absences 딕셔너리 세션에 추가 {(team, pitcher): return_date}
+_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}}
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
@@ -232,7 +217,6 @@ if not matchups.empty:
             home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
             fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
 
-            # 🔥 [NEW] 로고에 새로 만든 CSS 클래스 (mc-logo-wrap) 적용! 
             st.markdown(f"""
             <div class="{card_cls}">
                 <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
@@ -262,11 +246,9 @@ away_team, home_team, status = g['away'], g['home'], g['status']
 
 st.divider()
 
-# 🔥 [NEW] 이전 / 다음 경기 네비게이션 로직 추가
 prev_game_date = None
 next_game_date = None
 
-# 현재 선택된 팀의 일정 중 취소가 아닌 경기만 찾기
 my_team_real_games = my_all_games[my_all_games['상태'] != '우천취소']
 
 if not my_team_real_games.empty:
@@ -288,7 +270,6 @@ with nav_col1:
             st.session_state.cal_year = prev_game_date.year
             st.session_state.cal_month = prev_game_date.month
             
-            # 이전 날짜의 경기 정보 찾아서 세팅
             prev_pd = pd.to_datetime(prev_game_date)
             p_game = my_all_games[my_all_games['날짜'] == prev_pd].iloc[0]
             st.session_state.selected_game = {'away': p_game['팀'], 'home': p_game['상대팀'], 'status': p_game['상태'], 'away_score': p_game['득점'], 'home_score': p_game['실점']}
@@ -311,7 +292,6 @@ with nav_col3:
             st.session_state.cal_year = next_game_date.year
             st.session_state.cal_month = next_game_date.month
             
-            # 다음 날짜의 경기 정보 찾아서 세팅
             n_pd = pd.to_datetime(next_game_date)
             n_game = my_all_games[my_all_games['날짜'] == n_pd].iloc[0]
             st.session_state.selected_game = {'away': n_game['팀'], 'home': n_game['상대팀'], 'status': n_game['상태'], 'away_score': n_game['득점'], 'home_score': n_game['실점']}
@@ -319,7 +299,6 @@ with nav_col3:
             st.session_state.pitcher_home = None 
             st.rerun()
 st.markdown('</div>', unsafe_allow_html=True)
-
 
 left_col, right_col = st.columns(2)
 
@@ -349,7 +328,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             dt_str = selected_dt.strftime('%Y-%m-%d')
             is_overridden = (team, dt_str) in st.session_state.overrides
             
-            use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
+            # 🔥 [NEW] 수동 지정 & 결장자 관리 토글 2열 배치
+            t_col1, t_col2 = st.columns(2)
+            with t_col1:
+                use_manual = st.toggle(f"🛠️ 수동 지정", value=is_overridden, key=f"man_{team}_{dt_str}")
+            with t_col2:
+                use_absence = st.toggle(f"🏥 결장자 관리", key=f"abs_tgl_{team}_{dt_str}")
             
             if use_manual:
                 current_val = st.session_state.overrides.get((team, dt_str), "")
@@ -374,7 +358,39 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     st.session_state[pitcher_key] = None
                     st.rerun()
 
-            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt)
+            # 🔥 [NEW] 결장자 관리 입력 폼
+            if use_absence:
+                active_pitchers = get_active_rotation(working_df, team, selected_dt)
+                if active_pitchers:
+                    st.markdown('<div style="background:#fff5f5; padding:8px 10px; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+                    a_col1, a_col2, a_col3 = st.columns([4, 4, 2])
+                    with a_col1:
+                        absent_p = st.selectbox("선수 선택", active_pitchers, key=f"abs_p_{team}_{dt_str}", label_visibility="collapsed")
+                    with a_col2:
+                        return_d = st.date_input("복귀일", value=selected_dt + timedelta(days=10), key=f"abs_d_{team}_{dt_str}", label_visibility="collapsed")
+                    with a_col3:
+                        if st.button("등록", key=f"abs_btn_{team}_{dt_str}", use_container_width=True):
+                            st.session_state.absences[(team, absent_p)] = return_d
+                            st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    st.caption("등록 가능한 투수가 없습니다.")
+
+            # 🔥 [NEW] 현재 팀의 결장자 리스트 출력 & 해제 기능
+            team_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
+            if team_absences:
+                for p, d in team_absences.items():
+                    st.markdown(f"""
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <span class="absence-badge">🚑 {p} (재활/휴식) ~ {d.strftime('%m/%d')} 복귀</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if st.button(f"✖ {p} 결장 해제", key=f"del_abs_{team}_{p}", help="결장 해제", use_container_width=True):
+                        del st.session_state.absences[(team, p)]
+                        st.rerun()
+
+            # 시뮬레이터에 팀 결장 명단 넘겨주기!
+            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=team_absences)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
 

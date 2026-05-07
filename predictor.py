@@ -13,7 +13,8 @@ def get_active_rotation(df, team, target_date):
     recent_starters = past_games.sort_values('날짜', ascending=False).head(15)['선발투수'].dropna().unique()
     return [p for p in recent_starters if p != '-'][:6]
 
-def predict_starter(df, team, target_date):
+def predict_starter(df, team, target_date, team_absences=None):
+    if team_absences is None: team_absences = {}
     target_dt = pd.to_datetime(target_date)
     
     official_row = df[(df['날짜'] == target_dt) & (df['팀'] == team) & (df['상태'] == '예정') & (df['선발투수'] != '-')].copy()
@@ -62,11 +63,30 @@ def predict_starter(df, team, target_date):
         while sim_date <= target_dt:
             has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
             if has_game:
-                current_pitcher = sim_rotation_queue.pop(0)
+                # 🔥 [NEW] 결장자 관리 스마트 큐(Queue) 로직
+                available_pitcher = None
+                temp_queue = []
+                
+                while sim_rotation_queue:
+                    p = sim_rotation_queue.pop(0)
+                    # 만약 결장 명단에 있고, 아직 복귀일이 안 지났다면?
+                    if p in team_absences and sim_date < pd.to_datetime(team_absences[p]):
+                        temp_queue.append(p) # 임시 대기석으로 이동!
+                    else:
+                        available_pitcher = p # 등판 가능!
+                        break
+                
+                # 만약 전원 결장일 경우의 안전 장치 (임시 대기석에서 한 명 강제 등판)
+                if available_pitcher is None:
+                    available_pitcher = temp_queue.pop(0) if temp_queue else "예측 불가"
+                
                 if sim_date == target_dt:
-                    predicted_pitcher = current_pitcher
+                    predicted_pitcher = available_pitcher
                     break
-                sim_rotation_queue.append(current_pitcher)
+                
+                # 순서 재조립: 결장했던 애들은 다음 날 최우선 순위로 배치!
+                sim_rotation_queue = temp_queue + sim_rotation_queue + [available_pitcher]
+                
             sim_date += timedelta(days=1)
             
         if 'predicted_pitcher' not in locals():
@@ -100,10 +120,7 @@ def get_season_stats(df, pitcher_name, target_date):
         try:
             inn_str = str(inn_str).strip()
             if not inn_str or inn_str == '-': return 0.0
-            
-            # 🔥 네이버 유니코드 분수(⅓, ⅔) 완벽 방어!
             inn_str = inn_str.replace('⅓', ' 1/3').replace('⅔', ' 2/3').strip()
-            
             parts = inn_str.split()
             if len(parts) == 2:
                 whole = float(parts[0])
@@ -130,7 +147,6 @@ def get_season_stats(df, pitcher_name, target_date):
     whole_innings = int(total_innings_float)
     remainder = total_innings_float - whole_innings
     
-    # 🔥 출력할 때도 깔끔한 유니코드로 변경
     if remainder > 0.6: frac_str = " ⅔"
     elif remainder > 0.3: frac_str = " ⅓"
     else: frac_str = ""
