@@ -41,6 +41,23 @@ st.markdown("""
     .mc-cancel { font-size: 0.78rem; color: #9b2c2c; }
     .mc-manual { font-size: 0.78rem; color: #3182ce; font-weight: 800; }
     
+    /* 🔥 [NEW] 로고 크기 강제 고정용 CSS */
+    .mc-logo-wrap {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        overflow: hidden;
+        background-color: white; /* 투명 배경 로고를 위한 흰색 바탕 */
+    }
+    .mc-logo-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain; /* 찌그러지지 않게 꽉 차게 */
+    }
+    
     .team-panel { border-radius: 14px; padding: 18px 16px; height: 100%; min-width: 350px !important; }
     .team-name-big { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
     .team-label-small { font-size: 0.7rem; font-weight: 700; color: #a0aec0; }
@@ -50,7 +67,6 @@ st.markdown("""
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     
-    /* 버튼 줄바꿈 & 3줄 높이 강제 고정 CSS */
     div[data-testid="stButton"] button {
         height: auto !important;
         min-height: 75px !important; 
@@ -61,6 +77,12 @@ st.markdown("""
         word-break: keep-all !important;  
         line-height: 1.4 !important;      
         font-size: 0.85rem !important;    
+    }
+    
+    /* 🔥 [NEW] 이전/다음 화살표 버튼용 작은 사이즈 CSS (예측 버튼과 차별화) */
+    .nav-button-container div[data-testid="stButton"] button {
+        min-height: 40px !important;
+        padding: 4px 8px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -154,7 +176,6 @@ for week in cal_module.monthcalendar(year, month):
                         except: btn_label = f"{day} ✅"
                     elif g_status == '우천취소': 
                         btn_label = f"{day} ⚪"
-                    # 🔥 [NEW] 미래 경기인데 선발투수 이름이 있다면 오피셜 도장 ✅!
                     elif str(r['선발투수']) != '-':
                         btn_label = f"{day} ✅"
                     
@@ -211,12 +232,17 @@ if not matchups.empty:
             home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
             fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
 
+            # 🔥 [NEW] 로고에 새로 만든 CSS 클래스 (mc-logo-wrap) 적용! 
             st.markdown(f"""
             <div class="{card_cls}">
                 <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
-                    <img src="{away_logo}" width="36" style="border-radius: 50%;" onerror="this.onerror=null; this.src='{fallback_logo}'">
+                    <div class="mc-logo-wrap">
+                        <img src="{away_logo}" onerror="this.onerror=null; this.src='{fallback_logo}'">
+                    </div>
                     <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
-                    <img src="{home_logo}" width="36" style="border-radius: 50%;" onerror="this.onerror=null; this.src='{fallback_logo}'">
+                    <div class="mc-logo-wrap">
+                        <img src="{home_logo}" onerror="this.onerror=null; this.src='{fallback_logo}'">
+                    </div>
                 </div>
                 <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
                 {status_html}
@@ -235,12 +261,65 @@ g = st.session_state.selected_game
 away_team, home_team, status = g['away'], g['home'], g['status']
 
 st.divider()
-if status == '종료':
-    st.markdown(f'<div class="score-banner">{away_team} &nbsp; {g["away_score"]} : {g["home_score"]} &nbsp; {home_team}</div>', unsafe_allow_html=True)
-elif status == '우천취소':
-    st.error(f"☔ {away_team} vs {home_team} — 우천취소된 경기입니다."); st.stop()
-else:
-    st.markdown(f'<div class="score-banner upcoming">⏰ {away_team} vs {home_team} — 선발 투수 프리뷰</div>', unsafe_allow_html=True)
+
+# 🔥 [NEW] 이전 / 다음 경기 네비게이션 로직 추가
+prev_game_date = None
+next_game_date = None
+
+# 현재 선택된 팀의 일정 중 취소가 아닌 경기만 찾기
+my_team_real_games = my_all_games[my_all_games['상태'] != '우천취소']
+
+if not my_team_real_games.empty:
+    past_games = my_team_real_games[my_team_real_games['날짜'] < selected_dt]
+    if not past_games.empty:
+        prev_game_date = past_games.iloc[-1]['날짜'].date()
+        
+    future_games = my_team_real_games[my_team_real_games['날짜'] > selected_dt]
+    if not future_games.empty:
+        next_game_date = future_games.iloc[0]['날짜'].date()
+
+st.markdown('<div class="nav-button-container">', unsafe_allow_html=True)
+nav_col1, nav_col2, nav_col3 = st.columns([1, 4, 1])
+
+with nav_col1:
+    if prev_game_date:
+        if st.button(f"⏪ {prev_game_date.strftime('%m/%d')} 경기", use_container_width=True):
+            st.session_state.selected_date = prev_game_date
+            st.session_state.cal_year = prev_game_date.year
+            st.session_state.cal_month = prev_game_date.month
+            
+            # 이전 날짜의 경기 정보 찾아서 세팅
+            prev_pd = pd.to_datetime(prev_game_date)
+            p_game = my_all_games[my_all_games['날짜'] == prev_pd].iloc[0]
+            st.session_state.selected_game = {'away': p_game['팀'], 'home': p_game['상대팀'], 'status': p_game['상태'], 'away_score': p_game['득점'], 'home_score': p_game['실점']}
+            st.session_state.pitcher_away = None 
+            st.session_state.pitcher_home = None 
+            st.rerun()
+
+with nav_col2:
+    if status == '종료':
+        st.markdown(f'<div class="score-banner">{away_team} &nbsp; {g["away_score"]} : {g["home_score"]} &nbsp; {home_team}</div>', unsafe_allow_html=True)
+    elif status == '우천취소':
+        st.error(f"☔ {away_team} vs {home_team} — 우천취소된 경기입니다."); st.stop()
+    else:
+        st.markdown(f'<div class="score-banner upcoming">⏰ {away_team} vs {home_team} — 선발 투수 프리뷰</div>', unsafe_allow_html=True)
+
+with nav_col3:
+    if next_game_date:
+        if st.button(f"{next_game_date.strftime('%m/%d')} 경기 ⏩", use_container_width=True):
+            st.session_state.selected_date = next_game_date
+            st.session_state.cal_year = next_game_date.year
+            st.session_state.cal_month = next_game_date.month
+            
+            # 다음 날짜의 경기 정보 찾아서 세팅
+            n_pd = pd.to_datetime(next_game_date)
+            n_game = my_all_games[my_all_games['날짜'] == n_pd].iloc[0]
+            st.session_state.selected_game = {'away': n_game['팀'], 'home': n_game['상대팀'], 'status': n_game['상태'], 'away_score': n_game['득점'], 'home_score': n_game['실점']}
+            st.session_state.pitcher_away = None 
+            st.session_state.pitcher_home = None 
+            st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
+
 
 left_col, right_col = st.columns(2)
 
