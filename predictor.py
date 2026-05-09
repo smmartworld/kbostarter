@@ -17,7 +17,6 @@ def predict_starter(df, team, target_date, team_absences=None):
     if team_absences is None: team_absences = {}
     target_dt = pd.to_datetime(target_date)
     
-    # 1. 타겟 날짜 당일의 오피셜 확인
     official_row = df[(df['날짜'] == target_dt) & (df['팀'] == team) & (df['상태'] == '예정') & (df['선발투수'] != '-')].copy()
     is_official = False
     if not official_row.empty:
@@ -27,8 +26,6 @@ def predict_starter(df, team, target_date, team_absences=None):
     else:
         official_starter = None
 
-    # 🔥 [핵심 업그레이드] 타겟 날짜 '이전'의 모든 "선발투수가 확정된 경기"를 기준 데이터로 긁어옴!
-    # '종료', '수동확정' 뿐만 아니라 "오피셜이 뜬 미래의 예정 경기"도 이미 던진 것으로 취급!
     known_games = df[(df['팀'] == team) & 
                      (df['상태'].isin(['종료', '수동확정', '예정'])) & 
                      (df['선발투수'].notna()) & (df['선발투수'] != '-') & 
@@ -37,21 +34,22 @@ def predict_starter(df, team, target_date, team_absences=None):
     if known_games.empty: 
         return (official_starter if official_starter else "데이터 부족"), pd.DataFrame(), is_official
 
-    # 최근 15경기를 기준으로 로테이션 멤버 6명 추출
     recent_games = known_games.sort_values('날짜', ascending=False).head(15)
     rotation_pitchers = recent_games['선발투수'].dropna().unique()
     rotation_pitchers = [p for p in rotation_pitchers if p != '-'][:6] 
 
     rot_data = []
-    # 팀의 가장 마지막 "투수가 확정된" 경기 날짜 (예: 오늘이 9일이어도 10일 오피셜이 있으면 10일이 됨!)
     last_known_team_game = known_games['날짜'].max() 
+
+    # 🔥 [NEW] 선수별 '가장 마지막으로 던진 날짜'를 기록하는 메모장!
+    simulated_last_pitched = {}
 
     for p in rotation_pitchers:
         p_games = known_games[known_games['선발투수'] == p].sort_values('날짜')
         if not p_games.empty:
             last_game_dt = p_games.iloc[-1]['날짜']
+            simulated_last_pitched[p] = last_game_dt # 초기값은 실제 마지막 등판 날짜
             
-            # 스마트 9일 룰 적용
             if pd.notna(last_known_team_game):
                 days_since_last_appearance = (last_known_team_game - last_game_dt).days
                 if days_since_last_appearance >= 9 and p != official_starter:
@@ -68,7 +66,6 @@ def predict_starter(df, team, target_date, team_absences=None):
     if is_official:
         predicted_pitcher = official_starter
     else:
-        # 🔥 마지막으로 선발이 확정된 날짜의 "다음 날"부터 시뮬레이션 시작!
         sim_date = last_known_team_game + timedelta(days=1)
         sim_rotation_queue = list(rot_df['선발투수'])
         
@@ -91,8 +88,20 @@ def predict_starter(df, team, target_date, team_absences=None):
                 
                 if sim_date == target_dt:
                     predicted_pitcher = available_pitcher
+                    
+                    # 🔥 [NEW] 타겟 날짜 도착! 가상 등판 기록(simulated_last_pitched)으로 휴식일 일괄 업데이트!
+                    for idx, row in rot_df.iterrows():
+                        p_name = row['선발투수']
+                        if p_name in simulated_last_pitched:
+                            last_d = simulated_last_pitched[p_name]
+                            new_rest = max(0, (target_dt - last_d).days - 1)
+                            rot_df.at[idx, '휴식일'] = new_rest
                     break
                 
+                # 🔥 [NEW] 오늘 가상으로 던졌으니, 메모장에 날짜 업데이트! (타겟 날짜 전까지만)
+                if available_pitcher != "예측 불가":
+                    simulated_last_pitched[available_pitcher] = sim_date
+
                 sim_rotation_queue = temp_queue + sim_rotation_queue + [available_pitcher]
                 
             sim_date += timedelta(days=1)
@@ -103,7 +112,6 @@ def predict_starter(df, team, target_date, team_absences=None):
     return predicted_pitcher, rot_df[['선발투수', '휴식일']], is_official
 
 def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
-    # 통계는 오직 '종료'된 실제 경기만 반영
     pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
