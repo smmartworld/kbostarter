@@ -405,6 +405,19 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             show_pitcher = st.session_state[pitcher_key]
 
+            # 🔥 [NEW] 땜빵 선발(오피셜 또는 수동)이 로테이션 버튼 명단에 없으면 강제로 소환!
+            if show_pitcher and show_pitcher != "예측 불가" and show_pitcher != "-" and show_pitcher not in rotation_df['선발투수'].values:
+                # 과거 기록 싹 뒤져서 휴식일 계산 (처음 등판하면 '?'로 표시)
+                p_games = working_df[(working_df['팀'] == team) & 
+                                     (working_df['상태'].isin(['종료', '수동확정'])) & 
+                                     (working_df['선발투수'] == show_pitcher) & 
+                                     (working_df['날짜'] < selected_dt)].sort_values('날짜')
+                rest_days = max(0, (selected_dt - p_games.iloc[-1]['날짜']).days - 1) if not p_games.empty else "?"
+                
+                # 로테이션 명단 끝에 땜빵 투수 버튼 추가!
+                new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
+                rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
+
             if is_overridden:
                 st.info(f"👉 수동 지정됨: 🎯 {show_pitcher}")
             else:
