@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import os
 
-def master_collector_v16():
+def master_collector_v21():
     team_codes = {
         'KT': 'KT', 'KIA': 'HT', '롯데': 'LT', 'SSG': 'SK', 'LG': 'LG',
         'NC': 'NC', '두산': 'OB', '키움': 'WO', '삼성': 'SS', '한화': 'HH'
@@ -17,13 +17,14 @@ def master_collector_v16():
     start_date = today_obj - timedelta(days=3)
     end_date = today_obj + timedelta(days=7)
 
-    print(f"🚀 [V16] 심플 모드 가동! (진행중 경기는 '예정'으로 간주) 타겟 기간: {start_date} ~ {end_date}")
+    print(f"🚀 [V21] 라이브 스탯 방어 & 선발투수 보호 모드 가동! 타겟 기간: {start_date} ~ {end_date}")
 
     months_to_check = list(set([f"{start_date.month:02d}", f"{end_date.month:02d}"]))
     months_to_check.sort()
 
     new_data = []
-    # 🔥 [추가할 부분 1] 우리가 어제 저장해 둔 마스터데이터의 선발투수 기억해두기!
+    
+    # 🔥 1단계 방어막: 우리가 어제 저장해 둔 마스터데이터의 선발투수 기억해두기!
     file_name = '로테이션_마스터데이터.csv'
     saved_starters = {}
     if os.path.exists(file_name):
@@ -79,7 +80,6 @@ def master_collector_v16():
                 away_score, home_score = '-', '-'
                 nums = re.findall(r'\d+', clean_text)
                 
-                # 1차 KBO 텍스트 판독 (나중에 네이버 API로 덮어씀)
                 if "취소" in play_text: status = '우천취소'
                 elif len(nums) >= 2: 
                     status = '종료'
@@ -159,15 +159,14 @@ def master_collector_v16():
                                 a_name = game_info.get('awayStarterName', '-')
                                 h_name = game_info.get('homeStarterName', '-')
                                 
-                                # 1단계: 마스터데이터(어제 기록)에서 먼저 찾아보기
+                                # 1단계 방어막: 마스터데이터(어제 기록)에서 먼저 찾아보기
                                 if not a_name or a_name == '-':
                                     a_name = saved_starters.get((current_date_str, away_team), '-')
                                 if not h_name or h_name == '-':
                                     h_name = saved_starters.get((current_date_str, home_team), '-')
 
-                                # 2단계: 그래도 빈칸(-)이면, 최후의 보루로 네이버 라이브 박스스코어에서 직접 첫 번째 투수 뜯어오기!
+                                # 2단계 방어막: 그래도 빈칸(-)이면, 네이버 라이브 박스스코어에서 직접 뜯어오기! (오류 났던 부분 수정 완료!)
                                 if game_status not in ['BEFORE', 'CANCEL'] and (a_name == '-' or h_name == '-'):
-                                    try:
                                     try:
                                         record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
                                         rec_res = requests.get(record_url, headers=headers, timeout=5)
@@ -180,7 +179,8 @@ def master_collector_v16():
                                                     a_name = pitchers['away'][0].get('name', '-')
                                                 if h_name == '-' and pitchers.get('home') and len(pitchers['home']) > 0:
                                                     h_name = pitchers['home'][0].get('name', '-')
-                                    except: pass
+                                    except:
+                                        pass
 
                                 if not a_name: a_name = '-'
                                 if not h_name: h_name = '-'
@@ -190,7 +190,7 @@ def master_collector_v16():
                                     new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
                                     new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
                                     
-                                    p_status = "🔥 진행중(예정처리)" if game_status == 'PLAYING' else "⏰ 예정"
+                                    p_status = "🔥 진행중(예정처리)" if game_status in ['PLAYING', 'STARTED'] else "⏰ 예정"
                                     print(f"   {p_status} | {away_team}({a_name}) vs {home_team}({h_name}) [저장: {status}]")
                                     is_saved = True
 
@@ -233,6 +233,6 @@ def master_collector_v16():
     final_df['날짜'] = final_df['날짜'].dt.strftime('%Y-%m-%d')
     final_df.to_csv(file_name, index=False, encoding='utf-8-sig')
     
-    print(f"\n🎉 V16 심플 업데이트 완료! (크롤링 구간: {start_date} ~ {end_date})")
+    print(f"\n🎉 V21 실시간 업데이트 완료! (크롤링 구간: {start_date} ~ {end_date})")
 
-master_collector_v16()
+master_collector_v21()
