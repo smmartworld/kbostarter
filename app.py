@@ -504,18 +504,22 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     
             if team_db_absences:
                 for p, d in team_db_absences.items():
-                    st.markdown(f'<div class="absence-badge">🏢 [DB 공식] {p} ~ {d.strftime("%m/%d")} 복귀</div>', unsafe_allow_html=True)
+                    # 🔥 [NEW] 타겟 날짜가 복귀일보다 '전'일 때만 뱃지 띄우기!
+                    if selected_dt.date() < d:
+                        st.markdown(f'<div class="absence-badge">🏢 [DB 공식] {p} ~ {d.strftime("%m/%d")} 복귀</div>', unsafe_allow_html=True)
                     
             if team_local_absences:
                 for p, d in team_local_absences.items():
-                    st.markdown(f"""
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span class="absence-badge-local">🏠 [로컬] {p} ~ {d.strftime('%m/%d')} 복귀</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    if st.button(f"✖ {p} 로컬 해제", key=f"del_abs_{team}_{p}", use_container_width=True):
-                        del st.session_state.absences[(team, p)]
-                        st.rerun()
+                    # 🔥 [NEW] 로컬 뱃지도 동일하게 적용!
+                    if selected_dt.date() < d:
+                        st.markdown(f"""
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span class="absence-badge-local">🏠 [로컬] {p} ~ {d.strftime('%m/%d')} 복귀</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if st.button(f"✖ {p} 로컬 해제", key=f"del_abs_{team}_{p}", use_container_width=True):
+                            del st.session_state.absences[(team, p)]  # 👈 들여쓰기 4칸 추가!
+                            st.rerun()                                # 👈 들여쓰기 4칸 추가!
 
             # 🔥 [NEW] 시뮬레이터에 제외자 명단 던져주기!
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded)

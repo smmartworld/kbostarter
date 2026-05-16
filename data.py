@@ -110,8 +110,8 @@ def master_collector_v16():
                                 status = '우천취소'
                             elif game_status == 'RESULT':
                                 status = '종료'
-                            elif game_status in ['BEFORE', 'PLAYING']:
-                                status = '예정' # 진행 중이어도 무조건 '예정'으로 묶어버림!
+                            else:
+                                status = '예정' # 🔥 1.2이닝 방어! (RESULT 빼고 PLAYING, STARTED 등 무조건 예정 처리)
 
                             if status == '예정' and game_date_obj < today_obj:
                                 status = '우천취소'
@@ -158,11 +158,30 @@ def master_collector_v16():
                             elif status == '예정':
                                 a_name = game_info.get('awayStarterName', '-')
                                 h_name = game_info.get('homeStarterName', '-')
-                                # 🔥 [핵심 방어코드] 진행중(PLAYING)이라 네이버가 선발을 숨겼다면? 우리 기존 파일에서 가져옴!
+                                
+                                # 1단계: 마스터데이터(어제 기록)에서 먼저 찾아보기
                                 if not a_name or a_name == '-':
                                     a_name = saved_starters.get((current_date_str, away_team), '-')
                                 if not h_name or h_name == '-':
                                     h_name = saved_starters.get((current_date_str, home_team), '-')
+
+                                # 2단계: 그래도 빈칸(-)이면, 최후의 보루로 네이버 라이브 박스스코어에서 직접 첫 번째 투수 뜯어오기!
+                                if game_status not in ['BEFORE', 'CANCEL'] and (a_name == '-' or h_name == '-'):
+                                    try:
+                                    try:
+                                        record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
+                                        rec_res = requests.get(record_url, headers=headers, timeout=5)
+                                        if rec_res.status_code == 200:
+                                            rec_data = rec_res.json()
+                                            recordData = rec_data.get('result', {}).get('recordData') or {}
+                                            if 'pitchersBoxscore' in recordData:
+                                                pitchers = recordData['pitchersBoxscore']
+                                                if a_name == '-' and pitchers.get('away') and len(pitchers['away']) > 0:
+                                                    a_name = pitchers['away'][0].get('name', '-')
+                                                if h_name == '-' and pitchers.get('home') and len(pitchers['home']) > 0:
+                                                    h_name = pitchers['home'][0].get('name', '-')
+                                    except: pass
+
                                 if not a_name: a_name = '-'
                                 if not h_name: h_name = '-'
 
