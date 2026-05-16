@@ -11,7 +11,6 @@ from predictor import (
 
 st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layout="wide")
 
-# 🔥 [헤더 숨김 부활!] 다시 깔끔한 전체화면으로!
 st.markdown("""
 <style>
     header {visibility: hidden;}
@@ -106,9 +105,10 @@ for _, row in db_df.iterrows():
     m_type = str(row['타입']).strip()
     d_str = str(row['날짜']).strip()
     
-    if m_type == "수동선발":
+    # 🔥 [NEW] 바뀐 용어 적용!
+    if m_type == "선발 지정":
         db_overrides[(t, d_str)] = p
-    elif m_type == "결장휴식":
+    elif m_type == "휴식/말소":
         db_absences[(t, p)] = pd.to_datetime(d_str).date()
 
 _defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'admin_unlocked': False}
@@ -117,23 +117,19 @@ for k, v in _defaults.items():
 
 st.markdown('<div class="main-title">⚾ KBO 선발 예측기</div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# 🔥 [NEW] 메인 레이아웃: 콜A에 토글 메뉴 배치
-# ---------------------------------------------------------
 col_a, col_b, col_c = st.columns([1, 2, 1])
 
 with col_a:
     st.markdown("<div style='margin-top: 32px;'></div>", unsafe_allow_html=True)
-    show_admin = st.toggle("🛠️ 매니저 모드")
+    show_admin = st.toggle("🛠️ 관리자 모드")
 
 with col_b:
     st.session_state.my_team = st.selectbox("📣 나의 응원팀", list(TEAM_COLORS.keys()), index=list(TEAM_COLORS.keys()).index(st.session_state.my_team), label_visibility="collapsed")
 
-# 🔥 [NEW] 토글을 켜면 나타나는 인라인 관리자 패널
 if show_admin:
     st.markdown('<div class="admin-panel">', unsafe_allow_html=True)
     if not st.session_state.admin_unlocked:
-        st.markdown("**🔒 매니저 모드 잠금 해제**")
+        st.markdown("**🔒 관리자 모드 잠금 해제**")
         pw_c1, pw_c2 = st.columns([3, 1])
         with pw_c1:
             pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", label_visibility="collapsed")
@@ -145,10 +141,9 @@ if show_admin:
                 else:
                     st.error("비밀번호 오류!")
     else:
-        # 로그인 성공 후 패널
         lock_c1, lock_c2 = st.columns([4, 1])
         with lock_c1:
-            st.markdown("### 🔓 DB 영구 관리 패널")
+            st.markdown("### 🔓 DB 관리 패널")
         with lock_c2:
             if st.button("🔒 닫기", use_container_width=True):
                 st.session_state.admin_unlocked = False
@@ -164,11 +159,12 @@ if show_admin:
             custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
             final_player = custom_player if custom_player else m_player
         with c3:
-            m_type = st.radio("변동 유형", ["수동선발", "결장휴식"], key="adm_type", horizontal=True)
+            # 🔥 [NEW] 바뀐 라디오 버튼
+            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소"], key="adm_type", horizontal=True)
             
         c4, c5 = st.columns([3, 1])
         with c4:
-            if m_type == "수동선발":
+            if m_type == "선발 지정":
                 m_date = st.date_input("선발 등판 확정일", value=date.today())
             else:
                 m_date = st.date_input("복귀 예정일 (이 날부터 등판 가능)", value=date.today() + timedelta(days=10))
@@ -179,32 +175,33 @@ if show_admin:
                     new_row = pd.DataFrame([{'팀': m_team, '선수': final_player, '타입': m_type, '날짜': m_date.strftime("%Y-%m-%d")}])
                     updated_df = pd.concat([db_df, new_row], ignore_index=True)
                     try:
-                        conn.update(worksheet="시트1", data=updated_df)
+                        # 🔥 [NEW 에러 해결] spreadsheet=SHEET_URL 주소 명시 추가!
+                        conn.update(spreadsheet=SHEET_URL, data=updated_df)
                         st.success("✅ 시트에 저장됨!")
                         time.sleep(0.5)
                         st.rerun()
                     except Exception as e:
-                        st.error(f"저장 실패! Secrets 설정을 확인하세요.")
+                        st.error(f"저장 실패! 에러 로그: {e}")
                         
         if not db_df.empty:
             st.divider()
             st.markdown("**📋 현재 DB 등록 현황**")
             for i, row in db_df.iterrows():
                 t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
-                icon = "🎯" if typ == "수동선발" else "🚑"
+                icon = "🎯" if typ == "선발 지정" else "🚑"
                 dc1, dc2 = st.columns([4, 1])
                 with dc1:
                     st.markdown(f"**{t}** | {icon} {p} ({d})")
                 with dc2:
                     if st.button("✖ 삭제", key=f"del_{i}", use_container_width=True):
                         updated_df = db_df.drop(index=i)
-                        conn.update(worksheet="시트1", data=updated_df)
+                        # 🔥 [NEW 에러 해결] 여기서도 삭제할 때 주소 명시!
+                        conn.update(spreadsheet=SHEET_URL, data=updated_df)
                         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ---------------------------------------------------------
-# 데이터 병합 및 캘린더 로직
+# 메인 캘린더 & 경기 데이터 로직
 # ---------------------------------------------------------
 working_df = original_df.copy()
 
@@ -445,11 +442,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             
             local_override_val = st.session_state.overrides.get((team, dt_str))
             
+            # 🔥 [NEW] 하단 패널 임시라는 글자 삭제! 용어 통일
             t_col1, t_col2 = st.columns(2)
             with t_col1:
-                use_manual = st.toggle(f"🛠️ (임시) 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
+                use_manual = st.toggle(f"🛠️ 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
             with t_col2:
-                use_absence = st.toggle(f"🏥 (임시) 결장자", key=f"abs_tgl_{team}_{dt_str}")
+                use_absence = st.toggle(f"🏥 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
             
             if use_manual:
                 current_val = local_override_val if local_override_val else ""
@@ -501,10 +499,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 for p, d in team_local_absences.items():
                     st.markdown(f"""
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                        <span class="absence-badge-local">🏠 [임시] {p} ~ {d.strftime('%m/%d')} 복귀</span>
+                        <span class="absence-badge-local">🏠 [로컬] {p} ~ {d.strftime('%m/%d')} 복귀</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    if st.button(f"✖ {p} 임시 해제", key=f"del_abs_{team}_{p}", use_container_width=True):
+                    if st.button(f"✖ {p} 로컬 해제", key=f"del_abs_{team}_{p}", use_container_width=True):
                         del st.session_state.absences[(team, p)]
                         st.rerun()
 
@@ -530,8 +528,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
 
             if final_override_p:
-                src_text = "임시 적용" if local_override_val else "DB 공식"
-                st.info(f"👉 수동 지정됨 ({src_text}): 🎯 {show_pitcher}")
+                src_text = "로컬 적용" if local_override_val else "DB 공식"
+                st.info(f"👉 지정됨 ({src_text}): 🎯 {show_pitcher}")
             else:
                 st.markdown('<div class="sec-label">🎯 선발투수 선택</div>', unsafe_allow_html=True)
                 btn_cols = st.columns(len(rotation_df))
