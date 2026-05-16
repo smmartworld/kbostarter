@@ -612,7 +612,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
                     "이닝": st.column_config.TextColumn("이닝", alignment="center"),
                     "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
-                    "투구수": 양의정수포맷팅,
+                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
                     "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                 }
             )
