@@ -498,13 +498,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_db_absences = {p: d for (t, p), d in db_absences.items() if t == team}
             team_local_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
             combined_absences = {**team_db_absences, **team_local_absences}
-            
-            # 🔥 [NEW] 완전 제외자 명단을 추출해서 화면에도 회색 뱃지로 띄워줌!
+
+            # 🔥 완전 제외자 명단 계산 (UI에는 표시하지 않고 뒤에서 시뮬레이터로만 조용히 넘겨줌!)
             team_db_excluded = [p for t, p in db_excluded if t == team]
-            
-            if team_db_excluded:
-                for p in team_db_excluded:
-                    st.markdown(f'<div class="absence-badge-drop">🚫 [완전 제외] {p} (불펜/말소)</div>', unsafe_allow_html=True)
                     
             if team_db_absences:
                 for p, d in team_db_absences.items():
