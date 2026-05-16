@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import calendar as cal_module
+import time
 from datetime import date, timedelta
 from predictor import (
     predict_starter, get_active_rotation,
@@ -8,11 +9,12 @@ from predictor import (
     get_recent_rotation_list, TEAM_COLORS
 )
 
-# 🔥 [NEW] initial_sidebar_state="collapsed" 를 추가해서 처음엔 무조건 닫혀있게 만듦!
-st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layout="wide")
 
+# 🔥 [헤더 숨김 부활!] 다시 깔끔한 전체화면으로!
 st.markdown("""
 <style>
+    header {visibility: hidden;}
     #MainMenu {visibility: hidden;}
     .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 1200px; }
     .stApp { background: #ffffff; }
@@ -58,6 +60,8 @@ st.markdown("""
     
     .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-local { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
+    
+    .admin-panel { background: #fffaf0; border: 2px solid #fbd38d; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -107,87 +111,103 @@ for _, row in db_df.iterrows():
     elif m_type == "결장휴식":
         db_absences[(t, p)] = pd.to_datetime(d_str).date()
 
-# 🔥 [NEW] 다시 부활한 '임시 메모리' (로컬 샌드박스용)
-_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}}
+_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'admin_unlocked': False}
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-# ---------------------------------------------------------
-# 사이드바 매니저 모드 UI (비번 변경: password12)
-# ---------------------------------------------------------
-st.sidebar.title("🛠️ 매니저 모드")
-
-if 'admin_unlocked' not in st.session_state:
-    st.session_state.admin_unlocked = False
-
-if not st.session_state.admin_unlocked:
-    pw = st.sidebar.text_input("비밀번호 입력", type="password")
-    if st.sidebar.button("🔓 잠금 해제"):
-        if pw == "password12": 
-            st.session_state.admin_unlocked = True
-            st.rerun()
-        else:
-            st.sidebar.error("비밀번호 틀림!")
-else:
-    if st.sidebar.button("🔒 다시 잠그기"):
-        st.session_state.admin_unlocked = False
-        st.rerun()
-    
-    st.sidebar.divider()
-    st.sidebar.subheader("➕ DB 영구 등록 (공식)")
-    
-    m_team = st.sidebar.selectbox("팀 선택", list(TEAM_COLORS.keys()))
-    
-    active_p = get_active_rotation(original_df, m_team, date.today() + timedelta(days=7))
-    if not active_p: active_p = ["선발 기록 없음"]
-    m_player = st.sidebar.selectbox("선수 선택 (또는 직접 입력)", active_p)
-    custom_player = st.sidebar.text_input("목록에 없으면 직접 입력")
-    final_player = custom_player if custom_player else m_player
-    
-    m_type = st.sidebar.radio("변동 타입", ["수동선발", "결장휴식"])
-    
-    if m_type == "수동선발":
-        m_date = st.sidebar.date_input("선발 등판일", value=date.today())
-        btn_label = "🎯 DB 수동 선발 저장"
-    else:
-        m_date = st.sidebar.date_input("복귀 예정일", value=date.today() + timedelta(days=10))
-        btn_label = "🚑 DB 결장/휴식 저장"
-        
-    if st.sidebar.button(btn_label, type="primary"):
-        if final_player and final_player != "선발 기록 없음":
-            new_row = pd.DataFrame([{'팀': m_team, '선수': final_player, '타입': m_type, '날짜': m_date.strftime("%Y-%m-%d")}])
-            updated_df = pd.concat([db_df, new_row], ignore_index=True)
-            conn.update(worksheet="시트1", data=updated_df)
-            st.sidebar.success("✅ 시트에 영구 저장 완료!")
-            st.rerun()
-            
-    st.sidebar.divider()
-    st.sidebar.subheader("📋 현재 DB 등록 현황")
-    
-    if not db_df.empty:
-        for i, row in db_df.iterrows():
-            t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
-            icon = "🎯" if typ == "수동선발" else "🚑"
-            st.sidebar.markdown(f"**{t}** | {icon} {p} ({d})")
-            if st.sidebar.button(f"✖ DB에서 삭제", key=f"del_{i}"):
-                updated_df = db_df.drop(index=i)
-                conn.update(worksheet="시트1", data=updated_df)
-                st.rerun()
-    else:
-        st.sidebar.caption("등록된 데이터가 없습니다.")
-
-# ---------------------------------------------------------
-# 메인 화면 로직 
-# ---------------------------------------------------------
 st.markdown('<div class="main-title">⚾ KBO 선발 예측기</div>', unsafe_allow_html=True)
 
+# ---------------------------------------------------------
+# 🔥 [NEW] 메인 레이아웃: 콜A에 토글 메뉴 배치
+# ---------------------------------------------------------
 col_a, col_b, col_c = st.columns([1, 2, 1])
-with col_b:
-    st.session_state.my_team = st.selectbox("📣 나의 응원팀", list(TEAM_COLORS.keys()), index=list(TEAM_COLORS.keys()).index(st.session_state.my_team))
 
+with col_a:
+    st.markdown("<div style='margin-top: 32px;'></div>", unsafe_allow_html=True)
+    show_admin = st.toggle("🛠️ 매니저 모드")
+
+with col_b:
+    st.session_state.my_team = st.selectbox("📣 나의 응원팀", list(TEAM_COLORS.keys()), index=list(TEAM_COLORS.keys()).index(st.session_state.my_team), label_visibility="collapsed")
+
+# 🔥 [NEW] 토글을 켜면 나타나는 인라인 관리자 패널
+if show_admin:
+    st.markdown('<div class="admin-panel">', unsafe_allow_html=True)
+    if not st.session_state.admin_unlocked:
+        st.markdown("**🔒 매니저 모드 잠금 해제**")
+        pw_c1, pw_c2 = st.columns([3, 1])
+        with pw_c1:
+            pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", label_visibility="collapsed")
+        with pw_c2:
+            if st.button("해제", use_container_width=True):
+                if pw == "password12":
+                    st.session_state.admin_unlocked = True
+                    st.rerun()
+                else:
+                    st.error("비밀번호 오류!")
+    else:
+        # 로그인 성공 후 패널
+        lock_c1, lock_c2 = st.columns([4, 1])
+        with lock_c1:
+            st.markdown("### 🔓 DB 영구 관리 패널")
+        with lock_c2:
+            if st.button("🔒 닫기", use_container_width=True):
+                st.session_state.admin_unlocked = False
+                st.rerun()
+                
+        c1, c2, c3 = st.columns([2, 3, 2])
+        with c1:
+            m_team = st.selectbox("구단", list(TEAM_COLORS.keys()), key="adm_t")
+        with c2:
+            active_p = get_active_rotation(original_df, m_team, date.today() + timedelta(days=7))
+            if not active_p: active_p = ["선발 기록 없음"]
+            m_player = st.selectbox("선수", active_p, key="adm_p")
+            custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
+            final_player = custom_player if custom_player else m_player
+        with c3:
+            m_type = st.radio("변동 유형", ["수동선발", "결장휴식"], key="adm_type", horizontal=True)
+            
+        c4, c5 = st.columns([3, 1])
+        with c4:
+            if m_type == "수동선발":
+                m_date = st.date_input("선발 등판 확정일", value=date.today())
+            else:
+                m_date = st.date_input("복귀 예정일 (이 날부터 등판 가능)", value=date.today() + timedelta(days=10))
+        with c5:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("💾 DB 저장", type="primary", use_container_width=True):
+                if final_player and final_player != "선발 기록 없음":
+                    new_row = pd.DataFrame([{'팀': m_team, '선수': final_player, '타입': m_type, '날짜': m_date.strftime("%Y-%m-%d")}])
+                    updated_df = pd.concat([db_df, new_row], ignore_index=True)
+                    try:
+                        conn.update(worksheet="시트1", data=updated_df)
+                        st.success("✅ 시트에 저장됨!")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"저장 실패! Secrets 설정을 확인하세요.")
+                        
+        if not db_df.empty:
+            st.divider()
+            st.markdown("**📋 현재 DB 등록 현황**")
+            for i, row in db_df.iterrows():
+                t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
+                icon = "🎯" if typ == "수동선발" else "🚑"
+                dc1, dc2 = st.columns([4, 1])
+                with dc1:
+                    st.markdown(f"**{t}** | {icon} {p} ({d})")
+                with dc2:
+                    if st.button("✖ 삭제", key=f"del_{i}", use_container_width=True):
+                        updated_df = db_df.drop(index=i)
+                        conn.update(worksheet="시트1", data=updated_df)
+                        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------
+# 데이터 병합 및 캘린더 로직
+# ---------------------------------------------------------
 working_df = original_df.copy()
 
-# 🔥 [NEW] DB 데이터와 '임시' 로컬 데이터를 완벽하게 하나로 합침! (로컬 우선)
 all_overrides = {**db_overrides, **st.session_state.overrides}
 
 for (team, dt_str), pitcher in all_overrides.items():
@@ -423,7 +443,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
         else:
             dt_str = selected_dt.strftime('%Y-%m-%d')
             
-            # 🔥 [NEW] 다시 부활한 메인 화면 '임시 입력 폼'
             local_override_val = st.session_state.overrides.get((team, dt_str))
             
             t_col1, t_col2 = st.columns(2)
@@ -470,7 +489,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
 
-            # 🔥 DB 명단 + 로컬 임시 명단 합치기
             team_db_absences = {p: d for (t, p), d in db_absences.items() if t == team}
             team_local_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
             combined_absences = {**team_db_absences, **team_local_absences}
@@ -490,12 +508,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         del st.session_state.absences[(team, p)]
                         st.rerun()
 
-            # 시뮬레이터 실행!
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
 
-            # 누가 이길까? 임시 지정(Local) > DB 지정 > 예측값
             db_override_val = db_overrides.get((team, dt_str))
             final_override_p = local_override_val if local_override_val else db_override_val
 
