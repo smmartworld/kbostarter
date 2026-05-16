@@ -13,7 +13,6 @@ st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layou
 
 st.markdown("""
 <style>
-    header {visibility: hidden;}
     #MainMenu {visibility: hidden;}
     .block-container { padding-top: 1rem; padding-bottom: 0rem; max-width: 1200px; }
     .stApp { background: #ffffff; }
