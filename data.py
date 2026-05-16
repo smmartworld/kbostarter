@@ -23,6 +23,17 @@ def master_collector_v16():
     months_to_check.sort()
 
     new_data = []
+    # 🔥 [추가할 부분 1] 우리가 어제 저장해 둔 마스터데이터의 선발투수 기억해두기!
+    file_name = '로테이션_마스터데이터.csv'
+    saved_starters = {}
+    if os.path.exists(file_name):
+        try:
+            temp_df = pd.read_csv(file_name)
+            for _, row in temp_df.iterrows():
+                if pd.notna(row['선발투수']) and row['선발투수'] != '-':
+                    saved_starters[(str(row['날짜'])[:10], str(row['팀']))] = row['선발투수']
+        except Exception as e:
+            pass
 
     for month in months_to_check:
         print(f"\n🔍 2026년 {month}월 KBO 스케줄 추출 중...")
@@ -147,6 +158,11 @@ def master_collector_v16():
                             elif status == '예정':
                                 a_name = game_info.get('awayStarterName', '-')
                                 h_name = game_info.get('homeStarterName', '-')
+                                # 🔥 [핵심 방어코드] 진행중(PLAYING)이라 네이버가 선발을 숨겼다면? 우리 기존 파일에서 가져옴!
+                                if not a_name or a_name == '-':
+                                    a_name = saved_starters.get((current_date_str, away_team), '-')
+                                if not h_name or h_name == '-':
+                                    h_name = saved_starters.get((current_date_str, home_team), '-')
                                 if not a_name: a_name = '-'
                                 if not h_name: h_name = '-'
 
