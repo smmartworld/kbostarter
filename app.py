@@ -59,6 +59,7 @@ st.markdown("""
     
     .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-local { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
+    .absence-badge-drop { background: #edf2f7; border: 1px solid #e2e8f0; color: #718096; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     
     .admin-panel { background: #fffaf0; border: 2px solid #fbd38d; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; }
 </style>
@@ -97,6 +98,7 @@ db_df = load_manager_data()
 
 db_overrides = {}
 db_absences = {}
+db_excluded = set() # 🔥 [NEW] 로테이션 제외자 명단
 
 for _, row in db_df.iterrows():
     if pd.isna(row.get('팀')) or pd.isna(row.get('선수')): continue
@@ -105,11 +107,12 @@ for _, row in db_df.iterrows():
     m_type = str(row['타입']).strip()
     d_str = str(row['날짜']).strip()
     
-    # 🔥 [NEW] 바뀐 용어 적용!
     if m_type == "선발 지정":
         db_overrides[(t, d_str)] = p
     elif m_type == "휴식/말소":
         db_absences[(t, p)] = pd.to_datetime(d_str).date()
+    elif m_type == "로테이션 제외":
+        db_excluded.add((t, p)) # 🔥 [NEW] 제외 명단에 추가
 
 _defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'admin_unlocked': False}
 for k, v in _defaults.items():
@@ -149,7 +152,7 @@ if show_admin:
                 st.session_state.admin_unlocked = False
                 st.rerun()
                 
-        c1, c2, c3 = st.columns([2, 3, 2])
+        c1, c2, c3 = st.columns([2, 2, 4]) # 🔥 라디오 버튼이 길어져서 비율 조정!
         with c1:
             m_team = st.selectbox("구단", list(TEAM_COLORS.keys()), key="adm_t")
         with c2:
@@ -159,15 +162,20 @@ if show_admin:
             custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
             final_player = custom_player if custom_player else m_player
         with c3:
-            # 🔥 [NEW] 바뀐 라디오 버튼
-            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소"], key="adm_type", horizontal=True)
+            # 🔥 [NEW] 옵션 추가!
+            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외"], key="adm_type", horizontal=True)
             
         c4, c5 = st.columns([3, 1])
         with c4:
             if m_type == "선발 지정":
                 m_date = st.date_input("선발 등판 확정일", value=date.today())
-            else:
+            elif m_type == "휴식/말소":
                 m_date = st.date_input("복귀 예정일 (이 날부터 등판 가능)", value=date.today() + timedelta(days=10))
+            else:
+                # 🔥 [NEW] 완전 제외일 때는 날짜 필요 없음!
+                st.info("🚫 해당 투수를 선발 로테이션 계산에서 즉시 제외합니다.")
+                m_date = date.today() 
+                
         with c5:
             st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
             if st.button("💾 DB 저장", type="primary", use_container_width=True):
@@ -175,7 +183,6 @@ if show_admin:
                     new_row = pd.DataFrame([{'팀': m_team, '선수': final_player, '타입': m_type, '날짜': m_date.strftime("%Y-%m-%d")}])
                     updated_df = pd.concat([db_df, new_row], ignore_index=True)
                     try:
-                        # 🔥 [NEW 에러 해결] spreadsheet=SHEET_URL 주소 명시 추가!
                         conn.update(spreadsheet=SHEET_URL, data=updated_df)
                         st.success("✅ 시트에 저장됨!")
                         time.sleep(0.5)
@@ -188,21 +195,22 @@ if show_admin:
             st.markdown("**📋 현재 DB 등록 현황**")
             for i, row in db_df.iterrows():
                 t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
-                icon = "🎯" if typ == "선발 지정" else "🚑"
+                # 🔥 [NEW] 뱃지 아이콘 분기
+                icon = "🎯" if typ == "선발 지정" else ("🚑" if typ == "휴식/말소" else "🚫")
                 dc1, dc2 = st.columns([4, 1])
                 with dc1:
-                    st.markdown(f"**{t}** | {icon} {p} ({d})")
+                    if typ == "로테이션 제외":
+                        st.markdown(f"**{t}** | {icon} {p} (완전 제외)")
+                    else:
+                        st.markdown(f"**{t}** | {icon} {p} ({d})")
                 with dc2:
                     if st.button("✖ 삭제", key=f"del_{i}", use_container_width=True):
                         updated_df = db_df.drop(index=i)
-                        # 🔥 [NEW 에러 해결] 여기서도 삭제할 때 주소 명시!
                         conn.update(spreadsheet=SHEET_URL, data=updated_df)
                         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# 메인 캘린더 & 경기 데이터 로직
-# ---------------------------------------------------------
+
 working_df = original_df.copy()
 
 all_overrides = {**db_overrides, **st.session_state.overrides}
@@ -439,10 +447,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
         else:
             dt_str = selected_dt.strftime('%Y-%m-%d')
-            
             local_override_val = st.session_state.overrides.get((team, dt_str))
             
-            # 🔥 [NEW] 하단 패널 임시라는 글자 삭제! 용어 통일
             t_col1, t_col2 = st.columns(2)
             with t_col1:
                 use_manual = st.toggle(f"🛠️ 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
@@ -473,7 +479,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     st.rerun()
 
             if use_absence:
-                active_pitchers = get_active_rotation(working_df, team, selected_dt)
+                # 🔥 [NEW] 완전 제외자 명단 넘겨주기
+                team_db_excl = [p for t, p in db_excluded if t == team]
+                active_pitchers = get_active_rotation(working_df, team, selected_dt, excluded_pitchers=team_db_excl)
                 if active_pitchers:
                     st.markdown('<div style="background:#f7fafc; padding:8px 10px; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
                     a_col1, a_col2, a_col3 = st.columns([4, 4, 2])
@@ -491,6 +499,13 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_local_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
             combined_absences = {**team_db_absences, **team_local_absences}
             
+            # 🔥 [NEW] 완전 제외자 명단을 추출해서 화면에도 회색 뱃지로 띄워줌!
+            team_db_excluded = [p for t, p in db_excluded if t == team]
+            
+            if team_db_excluded:
+                for p in team_db_excluded:
+                    st.markdown(f'<div class="absence-badge-drop">🚫 [완전 제외] {p} (불펜/말소)</div>', unsafe_allow_html=True)
+                    
             if team_db_absences:
                 for p, d in team_db_absences.items():
                     st.markdown(f'<div class="absence-badge">🏢 [DB 공식] {p} ~ {d.strftime("%m/%d")} 복귀</div>', unsafe_allow_html=True)
@@ -506,7 +521,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         del st.session_state.absences[(team, p)]
                         st.rerun()
 
-            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences)
+            # 🔥 [NEW] 시뮬레이터에 제외자 명단 던져주기!
+            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
 
@@ -596,7 +612,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
                     "이닝": st.column_config.TextColumn("이닝", alignment="center"),
                     "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
-                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
+                    "투구수": 양의정수포맷팅,
                     "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                 }
             )
