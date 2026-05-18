@@ -24,9 +24,10 @@ st.markdown("""
     @media (max-width: 768px) {
         .block-container { padding-left: 0.2rem; padding-right: 0.2rem; }
         .cal-wrap { overflow-x: auto; padding: 10px; }
-        .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 550px !important; }
-        .cal-wrap div[data-testid="column"] { min-width: 75px !important; width: 14% !important; flex: 1 1 auto !important; }
-        div[data-testid="stButton"] button { padding: 0.2rem 0 !important; font-size: 0.75rem; }
+        /* 달력 너비와 버튼 크기를 모바일에 맞게 축소 */
+        .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 100% !important; }
+        .cal-wrap div[data-testid="column"] { min-width: 45px !important; width: 14% !important; flex: 1 1 auto !important; }
+        div[data-testid="stButton"] button { padding: 0.1rem 0 !important; font-size: 0.7rem; min-height: 40px !important; }
     }
 
     .cal-nav-title { text-align: center; font-size: 1.15rem; font-weight: 800; color: #2d3748; padding: 4px 0; }
@@ -45,7 +46,7 @@ st.markdown("""
     .mc-logo-wrap { display: inline-flex; justify-content: center; align-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background-color: white; }
     .mc-logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
     
-    .team-panel { border-radius: 14px; padding: 18px 16px; height: 100%; min-width: 350px !important; }
+    .team-panel { border-radius: 14px; padding: 18px 16px; height: 100%; width: 100% !important; box-sizing: border-box; }
     .team-name-big { font-size: 1.5rem; font-weight: 900; line-height: 1.2; }
     .team-label-small { font-size: 0.7rem; font-weight: 700; color: #a0aec0; }
     .sec-label { font-size: 0.72rem; font-weight: 800; color: #a0aec0; margin: 12px 0 5px 0; }
