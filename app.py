@@ -99,7 +99,8 @@ db_df = load_manager_data()
 
 db_overrides = {}
 db_absences = {}
-db_excluded = set() # 🔥 [NEW] 로테이션 제외자 명단
+db_excluded = set()
+db_cancels = set() # 🔥 [NEW] DB 우취 명단
 
 for _, row in db_df.iterrows():
     if pd.isna(row.get('팀')) or pd.isna(row.get('선수')): continue
@@ -113,9 +114,11 @@ for _, row in db_df.iterrows():
     elif m_type == "휴식/말소":
         db_absences[(t, p)] = pd.to_datetime(d_str).date()
     elif m_type == "로테이션 제외":
-        db_excluded.add((t, p)) # 🔥 [NEW] 제외 명단에 추가
+        db_excluded.add((t, p))
+    elif m_type == "우천취소": # 🔥 [NEW] 우취 파싱
+        db_cancels.add((t, d_str))
 
-_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'admin_unlocked': False}
+_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'cancels': set(), 'admin_unlocked': False}
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
@@ -162,9 +165,10 @@ if show_admin:
             m_player = st.selectbox("선수", active_p, key="adm_p")
             custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
             final_player = custom_player if custom_player else m_player
+        # 수정 후
         with c3:
-            # 🔥 [NEW] 옵션 추가!
-            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외"], key="adm_type", horizontal=True)
+            # 🔥 우천취소 옵션 추가!
+            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외", "우천취소"], key="adm_type", horizontal=True)
             
         c4, c5 = st.columns([3, 1])
         with c4:
@@ -172,10 +176,13 @@ if show_admin:
                 m_date = st.date_input("선발 등판 확정일", value=date.today())
             elif m_type == "휴식/말소":
                 m_date = st.date_input("복귀 예정일 (이 날부터 등판 가능)", value=date.today() + timedelta(days=10))
+            elif m_type == "우천취소": # 🔥 [NEW] 우취 UI
+                st.info("☔ 해당 날짜의 경기를 우천취소 처리하여 로테이션을 하루 밉니다.")
+                m_date = st.date_input("우천취소 날짜", value=date.today())
+                final_player = "팀전체" # 선수가 특정되지 않으므로 팀전체로 넣음
             else:
-                # 🔥 [NEW] 완전 제외일 때는 날짜 필요 없음!
                 st.info("🚫 해당 투수를 선발 로테이션 계산에서 즉시 제외합니다.")
-                m_date = date.today() 
+                m_date = date.today()
                 
         with c5:
             st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
@@ -450,11 +457,19 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             dt_str = selected_dt.strftime('%Y-%m-%d')
             local_override_val = st.session_state.overrides.get((team, dt_str))
             
-            t_col1, t_col2 = st.columns(2)
+            # 🔥 3열로 늘리고 우취 토글 추가!
+            t_col1, t_col2, t_col3 = st.columns(3)
             with t_col1:
                 use_manual = st.toggle(f"🛠️ 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
             with t_col2:
                 use_absence = st.toggle(f"🏥 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
+            with t_col3:
+                use_cancel = st.toggle(f"☔ 우취 처리", value=((team, dt_str) in st.session_state.cancels), key=f"can_tgl_{team}_{dt_str}")
+
+            if use_cancel:
+                st.session_state.cancels.add((team, dt_str))
+            else:
+                st.session_state.cancels.discard((team, dt_str))
             
             if use_manual:
                 current_val = local_override_val if local_override_val else ""
@@ -500,7 +515,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_local_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
             combined_absences = {**team_db_absences, **team_local_absences}
 
-            # 🔥 완전 제외자 명단 계산 (UI에는 표시하지 않고 뒤에서 시뮬레이터로만 조용히 넘겨줌!)
+            # 🔥 우취 명단 계산
+            team_db_cancels = [d for t, d in db_cancels if t == team]
+            team_local_cancels = [d for t, d in st.session_state.cancels if t == team]
+            combined_cancels = list(set(team_db_cancels + team_local_cancels))
+
             team_db_excluded = [p for t, p in db_excluded if t == team]
                     
             if team_db_absences:
@@ -522,8 +541,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             del st.session_state.absences[(team, p)]  # 👈 들여쓰기 4칸 추가!
                             st.rerun()                                # 👈 들여쓰기 4칸 추가!
 
-            # 🔥 [NEW] 시뮬레이터에 제외자 명단 던져주기!
-            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded)
+            if dt_str in combined_cancels:
+                st.error(f"☔ 해당 경기 우천취소 처리됨! ({team} 로테이션 하루 밀림)")
+
+            # 🔥 [NEW] 시뮬레이터에 우취 명단(team_cancels)까지 넘겨주기!
+            predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded, team_cancels=combined_cancels)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
 

@@ -2,9 +2,8 @@ import pandas as pd
 from datetime import timedelta
 
 TEAM_COLORS = {
-    'KIA': '#EA0029', '삼성': '#074CA1', 'LG': '#C30452', '두산': '#131230', 
-    'KT': '#000000', 'SSG': '#CE0E2D', '롯데': '#002955', '한화': '#FF6600', 
-    'NC': '#315288', '키움': '#570514'
+    '삼성': '#074CA1', '두산': '#131230', 'LG': '#C30452', 'KT': '#000000', 'SSG': '#CE0E2D',
+    '롯데': '#002955', '한화': '#FF6600', 'KIA': '#EA0029', 'NC': '#315288', '키움': '#570514'
 }
 
 # 🔥 [NEW] 제외된 투수는 로테이션 후보군에서 아예 삭제!
@@ -15,9 +14,11 @@ def get_active_rotation(df, team, target_date, excluded_pitchers=None):
     recent_starters = past_games.sort_values('날짜', ascending=False).head(15)['선발투수'].dropna().unique()
     return [p for p in recent_starters if p != '-' and p not in excluded_pitchers][:6]
 
-def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers=None):
+# 🔥 team_cancels 파라미터 추가!
+def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers=None, team_cancels=None):
     if team_absences is None: team_absences = {}
     if excluded_pitchers is None: excluded_pitchers = []
+    if team_cancels is None: team_cancels = [] # 🔥 [NEW] 우취 날짜 리스트
     
     target_dt = pd.to_datetime(target_date)
     
@@ -75,7 +76,12 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         sim_rotation_queue = list(rot_df['선발투수'])
         
         while sim_date <= target_dt:
-            has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
+            # 🔥 [NEW] DB나 로컬에서 지정한 우취 날짜인지 먼저 확인!
+            if team_cancels and sim_date.strftime("%Y-%m-%d") in team_cancels:
+                has_game = False
+            else:
+                has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
+            
             if has_game:
                 available_pitcher = None
                 temp_queue = []
