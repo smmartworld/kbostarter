@@ -221,6 +221,19 @@ if show_admin:
 
 working_df = original_df.copy()
 
+# 🔥 [NEW] 우취 명단 자동 확장 로직
+# db_cancels와 session_state.cancels를 합친 뒤, 상대팀도 찾아서 같이 넣어줌!
+all_cancels = set(db_cancels) | st.session_state.cancels
+expanded_cancels = set()
+
+for t, d_str in all_cancels:
+    expanded_cancels.add((t, d_str))
+    # 해당 날짜, 해당 팀의 데이터 찾아서 상대팀 알아내기
+    mask = (working_df['팀'] == t) & (working_df['날짜'] == pd.to_datetime(d_str))
+    if not working_df[mask].empty:
+        opp = working_df[mask].iloc[0]['상대팀']
+        expanded_cancels.add((opp, d_str))
+
 all_overrides = {**db_overrides, **st.session_state.overrides}
 
 for (team, dt_str), pitcher in all_overrides.items():
@@ -457,19 +470,26 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             dt_str = selected_dt.strftime('%Y-%m-%d')
             local_override_val = st.session_state.overrides.get((team, dt_str))
             
-            # 🔥 3열로 늘리고 우취 토글 추가!
             t_col1, t_col2, t_col3 = st.columns(3)
             with t_col1:
                 use_manual = st.toggle(f"🛠️ 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
             with t_col2:
                 use_absence = st.toggle(f"🏥 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
             with t_col3:
-                use_cancel = st.toggle(f"☔ 우취 처리", value=((team, dt_str) in st.session_state.cancels), key=f"can_tgl_{team}_{dt_str}")
+                # 🔥 expanded_cancels를 확인해서 상대팀이 우취됐어도 토글이 같이 켜지게 만듦!
+                is_cancelled = (team, dt_str) in expanded_cancels
+                use_cancel = st.toggle(f"☔ 우취 처리", value=is_cancelled, key=f"can_tgl_{team}_{dt_str}")
 
-            if use_cancel:
-                st.session_state.cancels.add((team, dt_str))
-            else:
-                st.session_state.cancels.discard((team, dt_str))
+            # 상태가 바뀌었을 때만 로직 실행 (무한 로딩 방지)
+            if use_cancel != is_cancelled:
+                if use_cancel:
+                    st.session_state.cancels.add((team, dt_str))
+                else:
+                    st.session_state.cancels.discard((team, dt_str))
+                    # 우취 끌 때는 상대팀 우취 기록도 같이 꺼주기!
+                    opp_team = home_team if is_away else away_team
+                    st.session_state.cancels.discard((opp_team, dt_str))
+                st.rerun()
             
             if use_manual:
                 current_val = local_override_val if local_override_val else ""
@@ -516,9 +536,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             combined_absences = {**team_db_absences, **team_local_absences}
 
             # 🔥 우취 명단 계산
-            team_db_cancels = [d for t, d in db_cancels if t == team]
-            team_local_cancels = [d for t, d in st.session_state.cancels if t == team]
-            combined_cancels = list(set(team_db_cancels + team_local_cancels))
+            combined_cancels = [d for t, d in expanded_cancels if t == team]
 
             team_db_excluded = [p for t, p in db_excluded if t == team]
                     
