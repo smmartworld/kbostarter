@@ -36,6 +36,11 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
                      (df['선발투수'].notna()) & (df['선발투수'] != '-') & 
                      (df['날짜'] < target_dt)].copy()
 
+    # 🔥 [NEW] 우취된 날짜는 '기존에 던진 기록(known_games)'에서 아예 삭제!
+    if team_cancels:
+        cancel_dt_list = pd.to_datetime(team_cancels)
+        known_games = known_games[~known_games['날짜'].isin(cancel_dt_list)]
+
     if known_games.empty: 
         return (official_starter if official_starter else "데이터 부족"), pd.DataFrame(), is_official
 
