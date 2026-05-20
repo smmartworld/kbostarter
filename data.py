@@ -2,7 +2,7 @@ import requests
 import re
 import csv
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 import os
 
@@ -12,7 +12,8 @@ def master_collector_v21():
         'NC': 'NC', '두산': 'OB', '키움': 'WO', '삼성': 'SS', '한화': 'HH'
     }
 
-    now_kst = datetime.utcnow() + timedelta(hours=9)
+    # 🔥 UTC deprecation 경고 해결!
+    now_kst = datetime.now(timezone.utc) + timedelta(hours=9)
     today_obj = now_kst.date()
     start_date = today_obj - timedelta(days=3)
     end_date = today_obj + timedelta(days=7)
@@ -41,11 +42,25 @@ def master_collector_v21():
         kbo_url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
         payload = {'leId': '1', 'srIdList': '0,9', 'seasonId': '2026', 'gameMonth': month, 'teamId': ''}
         
+        # 🔥 [NEW] KBO 서버가 XML/HTML 대신 예쁜 JSON을 주도록 AJAX 헤더 완벽 세팅!
+        kbo_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Referer': 'https://www.koreabaseball.com/Schedule/Calendar.aspx'
+        }
+        
         try:
-            kbo_res = requests.post(kbo_url, data=payload, timeout=10)
-            if kbo_res.status_code != 200: continue
+            kbo_res = requests.post(kbo_url, headers=kbo_headers, data=payload, timeout=10)
+            if kbo_res.status_code != 200: 
+                print(f"   ⚠️ KBO 서버 응답 에러: {kbo_res.status_code}")
+                continue
             kbo_data = kbo_res.json()
-        except:
+        except Exception as e:
+            # 🔥 에러가 나면 조용히 무시하지 않고 출력!
+            print(f"   ⚠️ KBO 크롤링 중 에러 발생: {e}")
+            if 'kbo_res' in locals():
+                print(f"   📄 서버가 준 정체불명 데이터: {kbo_res.text[:100]}") # 범인 몽타주 확인용
             continue
         
         rows = kbo_data.get('rows', [])
@@ -209,6 +224,12 @@ def master_collector_v21():
                         print(f"   ⚪ {current_date_str} | {away_team} vs {home_team} [저장: 정보 부족]")
 
     print("\n💾 데이터 병합(Upsert) 작업 시작...")
+    
+    # 🔥 [NEW] 치명적 버그 수정: 크롤링 에러로 가져온 새 데이터가 하나도 없으면 기존 데이터 보호!
+    if len(new_data) == 0:
+        print("   🚨 크롤링된 새 데이터가 없습니다! 기존 마스터데이터 삭제를 막기 위해 병합을 취소합니다.")
+        return
+        
     columns = ['날짜', '팀', '상대팀', '구장', '상태', '득점', '실점', '선발투수', '이닝', '투구수', '피안타', '사사구', '자책점']
     new_df = pd.DataFrame(new_data, columns=columns)
     new_df['날짜'] = pd.to_datetime(new_df['날짜'])
