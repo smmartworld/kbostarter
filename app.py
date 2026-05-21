@@ -590,25 +590,23 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 st.info(f"👉 지정됨 ({src_text}): 🎯 {show_pitcher}")
 
             st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
-            btn_cols = st.columns(len(rot_df))
-            for j, rot_row in rot_df.iterrows():
+            
+            # 🔥 아까 rot_df라고 잘못 적은 부분을 rotation_df로 싹 바꿨어!
+            btn_cols = st.columns(len(rotation_df))
+            for j, rot_row in rotation_df.iterrows():
                 pname = rot_row['선발투수']
                 with btn_cols[j]:
                     is_active = (show_pitcher == pname)
                     
+                    # 🔥 [NEW] 선택된 날짜 기준으로 이 투수가 현재 휴식/말소 상태인지 판별!
                     is_absent = False
-                    return_date_str = ""
-
-                    if pname in combined_absences:
-                        return_date = combined_absences[pname]
-
-                        # 아직 복귀 전이면 휴식 상태
-                        if selected_dt.date() < return_date:
-                            is_absent = True
-                            return_date_str = return_date.strftime("%m/%d")
-
+                    if pname in combined_absences and selected_dt.date() < combined_absences[pname]:
+                        is_absent = True
+                    
                     if is_absent:
-                        btn_text = f"🚑 휴식중\n{pname}\n(~{return_date_str})"
+                        # 휴식 중이면 텍스트를 바꾸고, 아래 st.button에서 disabled 처리
+                        return_date_str = combined_absences[pname].strftime('%m/%d')
+                        btn_text = f"🏥 휴식중\n{pname}\n({return_date_str} 복귀)"
                     elif pname == predicted:
                         if is_official:
                             btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
@@ -617,15 +615,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
-                    # 수동 지정(override) 상태일 때는 버튼 클릭 시 아무 동작 안 하도록(또는 경고 띄우도록) disabled 처리하거나 로직 변경 가능해. 여기선 일단 버튼 기능은 살려뒀어.
-                    if st.button(
-                        btn_text,
-                        key=f"btn_{pitcher_key}_{pname}",
-                        type="secondary" if is_absent else ("primary" if is_active else "secondary"),
-                        use_container_width=True,
-                        disabled=is_absent
-                    ):                        
-                    # 만약 수동 지정 상태인데 다른 버튼을 누르면 풀리게 하려면 여기서 override 초기화 로직을 넣어도 돼!
+                    # 🔥 [NEW] disabled=is_absent 옵션을 추가해서 휴식 중인 투수는 클릭 불가능한 회색 버튼으로 디밍 처리!
+                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True, disabled=is_absent):
+                        # 만약 수동 지정 상태인데 다른 버튼을 누르면 풀리게 하려면 여기서 override 초기화 로직을 넣어도 돼!
                         st.session_state[pitcher_key] = pname; st.rerun()
 
             if show_pitcher:
