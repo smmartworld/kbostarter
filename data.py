@@ -15,8 +15,8 @@ def master_collector_v21():
     # 🔥 UTC deprecation 경고 해결!
     now_kst = datetime.now(timezone.utc) + timedelta(hours=9)
     today_obj = now_kst.date()
-    start_date = today_obj - timedelta(days=3)
-    end_date = today_obj + timedelta(days=7)
+    start_date = today_obj - timedelta(days=7)
+    end_date = today_obj + timedelta(days=5)
 
     print(f"🚀 [V21] 라이브 스탯 방어 & 선발투수 보호 모드 가동! 타겟 기간: {start_date} ~ {end_date}")
 
