@@ -584,27 +584,30 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
 
+            # 🔥 지정 여부와 상관없이 선발투수 로테이션 블록을 항상 그리도록 분기 제거!
             if final_override_p:
                 src_text = "로컬 적용" if local_override_val else "DB 공식"
                 st.info(f"👉 지정됨 ({src_text}): 🎯 {show_pitcher}")
-            else:
-                st.markdown('<div class="sec-label">🎯 선발투수 선택</div>', unsafe_allow_html=True)
-                btn_cols = st.columns(len(rotation_df))
-                for j, rot_row in rotation_df.iterrows():
-                    pname = rot_row['선발투수']
-                    with btn_cols[j]:
-                        is_active = (show_pitcher == pname)
-                        
-                        if pname == predicted:
-                            if is_official:
-                                btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
-                            else:
-                                btn_text = f"🎯 예상\n{pname}\n({rot_row['휴식일']}일)"
+
+            st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
+            btn_cols = st.columns(len(rotation_df))
+            for j, rot_row in rotation_df.iterrows():
+                pname = rot_row['선발투수']
+                with btn_cols[j]:
+                    is_active = (show_pitcher == pname)
+                    
+                    if pname == predicted:
+                        if is_official:
+                            btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
-                            btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
-                            
-                        if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
-                            st.session_state[pitcher_key] = pname; st.rerun()
+                            btn_text = f"🎯 예상\n{pname}\n({rot_row['휴식일']}일)"
+                    else:
+                        btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
+                        
+                    # 수동 지정(override) 상태일 때는 버튼 클릭 시 아무 동작 안 하도록(또는 경고 띄우도록) disabled 처리하거나 로직 변경 가능해. 여기선 일단 버튼 기능은 살려뒀어.
+                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
+                        # 만약 수동 지정 상태인데 다른 버튼을 누르면 풀리게 하려면 여기서 override 초기화 로직을 넣어도 돼!
+                        st.session_state[pitcher_key] = pname; st.rerun()
 
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
