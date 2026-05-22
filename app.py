@@ -612,12 +612,20 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
 
-            if pitcher_source in ["로컬 적용", "DB 공식"]:
-                st.info(f"👉 지정됨 ({pitcher_source}): 🎯 {show_pitcher}")
-            elif pitcher_source == "오피셜":
-                st.success(f"✅ 오피셜 발표: {show_pitcher}")
-            elif pitcher_source == "자동 예측":
-                st.caption(f"🎯 자동 예측 선발: {show_pitcher}")
+            badge_html = ""
+            if pitcher_source == "로컬 적용":
+                badge_html = '<span style="color:#3182ce; background:#ebf8ff; border:1px solid #bee3f8; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">🛠️ 로컬 수동</span>'
+            elif pitcher_source == "DB 공식":
+                badge_html = '<span style="color:#dd6b20; background:#fffaf0; border:1px solid #feebc8; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">🏢 DB 고정</span>'
+
+            # flex-box와 min-height로 뱃지가 없어도 좌우 대칭 완벽 유지!
+            st.markdown(f'''
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin: 12px 0 5px 0; min-height: 24px;">
+                <div class="sec-label" style="margin:0;">🎯 선발투수 로테이션 현황</div>
+                <div>{badge_html}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+
 
             st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
             
