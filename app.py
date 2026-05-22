@@ -548,35 +548,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_db_absences = {p: d for (t, p), d in db_absences.items() if t == team}
             team_local_absences = {p: d for (t, p), d in st.session_state.absences.items() if t == team}
             combined_absences = {**team_db_absences, **team_local_absences}
-
-            # 🔥 우취 명단 계산
             combined_cancels = [d for t, d in expanded_cancels if t == team]
 
             team_db_excluded = [p for t, p in db_excluded if t == team]
-                    
-            if team_db_absences:
-                for p, d in team_db_absences.items():
-                    # 🔥 [NEW] 타겟 날짜가 복귀일보다 '전'일 때만 뱃지 띄우기!
-                    if selected_dt.date() < d:
-                        st.markdown(f'<div class="absence-badge">🏢 [DB 공식] {p} ~ {d.strftime("%m/%d")} 복귀</div>', unsafe_allow_html=True)
-                    
-            if team_local_absences:
-                for p, d in team_local_absences.items():
-                    # 🔥 [NEW] 로컬 뱃지도 동일하게 적용!
-                    if selected_dt.date() < d:
-                        st.markdown(f"""
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                            <span class="absence-badge-local">🏠 [로컬] {p} ~ {d.strftime('%m/%d')} 복귀</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        if st.button(f"✖ {p} 로컬 해제", key=f"del_abs_{team}_{p}", use_container_width=True):
-                            del st.session_state.absences[(team, p)]  # 👈 들여쓰기 4칸 추가!
-                            st.rerun()                                # 👈 들여쓰기 4칸 추가!
 
-            if dt_str in combined_cancels:
-                st.error(f"☔ 해당 경기 우천취소 처리됨! ({team} 로테이션 하루 밀림)")
-
-            # 🔥 [NEW] 시뮬레이터에 우취 명단(team_cancels)까지 넘겨주기!
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded, team_cancels=combined_cancels)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
@@ -611,46 +586,56 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 rest_days = max(0, (selected_dt - p_games.iloc[-1]['날짜']).days - 1) if not p_games.empty else "?"
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
+                        # ----------------------------------------------------
+            # ⚾ 대시보드 상태 패널
             # ----------------------------------------------------
-            # 🔥 [NEW] ⚾ 대시보드 감성 고정 상태 패널 (라이트 모드)
-            # ----------------------------------------------------
+
             team_color = TEAM_COLORS.get(team, "#4a5568")
 
-            # 1. 상태 및 선발 투수 세팅 (밝은 배경에 잘 보이는 진한 색상으로 튜닝!)
             if pitcher_source == "로컬 적용":
-                s_icon, s_text, s_color = "🏠", f"로컬: {show_pitcher}", "#2b6cb0" # 짙은 파랑
-            elif pitcher_source == "DB 공식":
-                s_icon, s_text, s_color = "🏢", f"DB: {show_pitcher}", "#c05621" # 짙은 주황
-            elif pitcher_source == "오피셜":
-                s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a" # 짙은 초록
-            else:
-                s_icon, s_text, s_color = "🤖", f"예측: {show_pitcher}", "#4a5568" # 진한 회색 (기존 흰회색에서 변경)
+                s_icon, s_text, s_color = "🏠", f"로컬: {show_pitcher}", "#2b6cb0"
 
-            # 2. 기타 특이사항(우취, 휴식, 제외) 하나로 모으기
+            elif pitcher_source == "DB 공식":
+                s_icon, s_text, s_color = "🏢", f"DB: {show_pitcher}", "#c05621"
+
+            elif pitcher_source == "오피셜":
+                s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a"
+
+            else:
+                s_icon, s_text, s_color = "🤖", f"예측: {show_pitcher}", "#4a5568"
+
             info_badges = []
-            
-            # 우취 체크 (밝은 배경용 진한 빨강)
-            if dt_str in combined_cancels: 
-                info_badges.append("<span style='color:#e53e3e; font-weight:700;'>☔ 우천취소</span>")
-                
-            # 해당 팀 투수들 중 휴식/제외자 스캔해서 전광판에 추가
-            team_pitchers = working_df[working_df['팀'] == team]['선발투수'].dropna().unique()
+
+            if dt_str in combined_cancels:
+                info_badges.append(
+                    "<span style='color:#e53e3e; font-weight:700;'>☔ 우천취소</span>"
+                )
+
+            team_pitchers = working_df[
+                working_df['팀'] == team
+            ]['선발투수'].dropna().unique()
+
             for p in team_pitchers:
+
                 if p in combined_absences:
                     ret_dt = pd.to_datetime(combined_absences[p]).date()
-                    if selected_dt.date() < ret_dt:
-                        # 밝은 배경용 진한 머스타드색
-                        info_badges.append(f"<span style='color:#d69e2e; font-weight:700;'>🚑 {p}(~{ret_dt.strftime('%m/%d')})</span>")
-                if p in team_db_excluded:
-                    info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
-            # 특이사항 텍스트 조합
+                    if selected_dt.date() < ret_dt:
+                        info_badges.append(
+                            f"<span style='color:#d69e2e; font-weight:700;'>🚑 {p}(~{ret_dt.strftime('%m/%d')})</span>"
+                        )
+
+                if p in team_db_excluded:
+                    info_badges.append(
+                        f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>"
+                    )
+
             if info_badges:
                 info_html = " <span style='color:#cbd5e0; margin: 0 10px;'>/</span> ".join(info_badges)
+
             else:
                 info_html = "<span style='color:#a0aec0;'>특이사항 없음</span>"
 
-            # 3. HTML 렌더링 (가로 스크롤 & 높이 절대 고정, 네가 만든 라이트 모드 스타일 적용!)
             scoreboard_html = f"""
             <div style="
                 background: #f8fafc;
@@ -663,27 +648,50 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 box-shadow: 0 1px 3px rgba(0,0,0,0.04);
                 font-family: 'Malgun Gothic', sans-serif;
             ">
-                <style>
-                    .sb-scroll::-webkit-scrollbar {{ display: none; }}
-                    .sb-scroll {{ -ms-overflow-style: none; scrollbar-width: none; }}
-                </style>
-                <div class="sb-scroll" style="display: flex; align-items: center; width: 100%; height: 100%; overflow-x: auto; white-space: nowrap;">
-                    
-                    <div style="font-weight: 800; font-size: 0.95rem; color: {s_color}; flex-shrink: 0;">
+
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    width:100%;
+                    height:100%;
+                    overflow-x:auto;
+                    white-space:nowrap;
+                    scrollbar-width:none;
+                    -ms-overflow-style:none;
+                ">
+
+                    <div style="
+                        font-weight:800;
+                        font-size:0.95rem;
+                        color:{s_color};
+                        flex-shrink:0;
+                    ">
                         {s_icon} {s_text}
                     </div>
-                    
-                    <div style="width: 2px; height: 16px; background: #e2e8f0; flex-shrink: 0; margin: 0 16px;"></div>
-                    
-                    <div style="font-size: 0.85rem; font-weight: 600; flex-shrink: 0; display: flex; align-items: center;">
+
+                    <div style="
+                        width:2px;
+                        height:16px;
+                        background:#e2e8f0;
+                        flex-shrink:0;
+                        margin:0 16px;
+                    "></div>
+
+                    <div style="
+                        font-size:0.85rem;
+                        font-weight:600;
+                        flex-shrink:0;
+                        display:flex;
+                        align-items:center;
+                    ">
                         {info_html}
                     </div>
+
                 </div>
             </div>
             """
+
             st.markdown(scoreboard_html, unsafe_allow_html=True)
-            
-            st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
 
             btn_cols = st.columns(len(rotation_df))
             for j, rot_row in rotation_df.iterrows():
