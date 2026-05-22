@@ -586,7 +586,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 rest_days = max(0, (selected_dt - p_games.iloc[-1]['날짜']).days - 1) if not p_games.empty else "?"
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
-                        # ----------------------------------------------------
+            # ----------------------------------------------------
             # ⚾ 대시보드 상태 패널
             # ----------------------------------------------------
 
