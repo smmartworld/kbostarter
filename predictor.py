@@ -31,10 +31,14 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     else:
         official_starter = None
 
-    known_games = df[(df['팀'] == team) & 
-                     (df['상태'].isin(['종료', '수동확정', '예정'])) & 
-                     (df['선발투수'].notna()) & (df['선발투수'] != '-') & 
-                     (df['날짜'] < target_dt)].copy()
+    # 🔥 실제로 던진 경기만 로테이션 소비로 인정
+    known_games = df[
+        (df['팀'] == team) &
+        (df['상태'] == '종료') &
+        (df['선발투수'].notna()) &
+        (df['선발투수'] != '-') &
+        (df['날짜'] < target_dt)
+    ].copy()
 
     # 🔥 [NEW] 우취된 날짜는 '기존에 던진 기록(known_games)'에서 아예 삭제!
     if team_cancels:
@@ -87,17 +91,41 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
             else:
                 has_game = not df[(df['날짜'] == sim_date) & (df['팀'] == team) & (df['상태'] != '우천취소')].empty
             
+                # 🔥 미래 오피셜 / DB 지정 선발 우선 반영
+                fixed_row = df[
+                    (df['날짜'] == sim_date) &
+                    (df['팀'] == team) &
+                    (df['선발투수'].notna()) &
+                    (df['선발투수'] != '-')
+                ]
+
+                fixed_pitcher = None
+
+                if not fixed_row.empty:
+                    fixed_pitcher = fixed_row.iloc[0]['선발투수']
+
+
             if has_game:
-                available_pitcher = None
+
                 temp_queue = []
-                
-                while sim_rotation_queue:
-                    p = sim_rotation_queue.pop(0)
-                    if p in team_absences and sim_date < pd.to_datetime(team_absences[p]):
-                        temp_queue.append(p)
-                    else:
-                        available_pitcher = p
-                        break
+                available_pitcher = None
+
+                # 🔥 미래에 이미 지정된 선발이 있으면 우선 사용
+                if fixed_pitcher:
+                    available_pitcher = fixed_pitcher
+
+                    if fixed_pitcher in sim_rotation_queue:
+                        sim_rotation_queue.remove(fixed_pitcher)
+
+                else:
+
+                    while sim_rotation_queue:
+                        p = sim_rotation_queue.pop(0)
+                        if p in team_absences and sim_date < pd.to_datetime(team_absences[p]):
+                            temp_queue.append(p)
+                        else:
+                            available_pitcher = p
+                            break
                 
                 if available_pitcher is None:
                     available_pitcher = temp_queue.pop(0) if temp_queue else "예측 불가"
