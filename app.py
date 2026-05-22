@@ -612,20 +612,34 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
 
-            badge_html = ""
+                        # 🔥 상태 안내 라인 (항상 높이 고정해서 좌우 균형 유지)
+            status_message = "&nbsp;"
+            status_bg = "#ffffff"
+
             if pitcher_source == "로컬 적용":
-                badge_html = '<span style="color:#3182ce; background:#ebf8ff; border:1px solid #bee3f8; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">🛠️ 로컬 수동</span>'
+                status_message = "🏠 로컬 시뮬레이션 적용중"
+                status_bg = "#ebf8ff"
+
             elif pitcher_source == "DB 공식":
-                badge_html = '<span style="color:#dd6b20; background:#fffaf0; border:1px solid #feebc8; padding:3px 8px; border-radius:6px; font-size:0.75rem; font-weight:700;">🏢 DB 고정</span>'
+                status_message = "🛠️ DB 지정 선발 적용중"
+                status_bg = "#fffaf0"
 
-            # flex-box와 min-height로 뱃지가 없어도 좌우 대칭 완벽 유지!
-            st.markdown(f'''
-            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin: 12px 0 5px 0; min-height: 24px;">
-                <div class="sec-label" style="margin:0;">🎯 선발투수 로테이션 현황</div>
-                <div>{badge_html}</div>
+            st.markdown(f"""
+            <div style="
+                height: 38px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-bottom: 8px;
+                border-radius: 8px;
+                background: {status_bg};
+                font-size: 0.88rem;
+                font-weight: 700;
+                color: #4a5568;
+            ">
+                {status_message}
             </div>
-            ''', unsafe_allow_html=True)
-
+            """, unsafe_allow_html=True)
 
             st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
             
