@@ -221,7 +221,12 @@ def get_season_stats(df, pitcher_name, target_date):
     }
 
 def get_recent_rotation_list(df, team, target_date, n=10):
-    team_df = df[(df['팀'] == team) & (df['상태'].isin(['종료', '수동확정'])) & (df['선발투수'] != '-') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜', ascending=False)
+    team_df = df[
+        (df['팀'] == team) &
+        (df['상태'] == '종료') &
+        (df['선발투수'] != '-') &
+        (df['날짜'] < pd.to_datetime(target_date))
+    ].copy().sort_values('날짜', ascending=False)
     recent = team_df.head(n).copy()
     if recent.empty: return pd.DataFrame()
 
