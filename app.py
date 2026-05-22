@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import calendar as cal_module
 import time
@@ -691,7 +692,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             </div>
             """
 
-            st.markdown(scoreboard_html, unsafe_allow_html=True)
+            components.html(scoreboard_html, height=60)
 
             btn_cols = st.columns(len(rotation_df))
             for j, rot_row in rotation_df.iterrows():
