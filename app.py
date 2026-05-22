@@ -234,14 +234,28 @@ for t, d_str in all_cancels:
         opp = working_df[mask].iloc[0]['상대팀']
         expanded_cancels.add((opp, d_str))
 
-all_overrides = {**db_overrides, **st.session_state.overrides}
+# 🔥 [NEW] 1단계: 구글 시트 DB 강제 지정 적용 (오피셜이 없을 때만 백엔드 데이터에 반영!)
+for (team, dt_str), pitcher in db_overrides.items():
+    dt_pd = pd.to_datetime(dt_str)
+    mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
+    if mask.any():
+        current_status = working_df.loc[mask, '상태'].values[0]
+        current_pitcher = working_df.loc[mask, '선발투수'].values[0]
+        
+        # 이미 현실 KBO 오피셜 선발투수가 나온 상태('예정'이면서 투수가 있는 경우)라면 DB 지정을 패스!
+        if current_status == '예정' and pd.notna(current_pitcher) and current_pitcher != '-':
+            continue
+            
+        working_df.loc[mask, '선발투수'] = pitcher
+        working_df.loc[mask, '상태'] = '수동확정' 
 
-for (team, dt_str), pitcher in all_overrides.items():
+# 🔥 [NEW] 2단계: 로컬 샌드박스 수동 지정 적용 (유저의 What-if 테스트를 위해 백엔드 데이터에 반영!)
+for (team, dt_str), pitcher in st.session_state.overrides.items():
     dt_pd = pd.to_datetime(dt_str)
     mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
     if mask.any():
         working_df.loc[mask, '선발투수'] = pitcher
-        working_df.loc[mask, '상태'] = '수동확정' 
+        working_df.loc[mask, '상태'] = '수동확정'
 
 year, month = st.session_state.cal_year, st.session_state.cal_month
 month_df = working_df[(working_df['날짜'].dt.year == year) & (working_df['날짜'].dt.month == month)]
@@ -568,10 +582,24 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if rotation_df.empty: st.warning("데이터 부족"); return
 
             db_override_val = db_overrides.get((team, dt_str))
-            final_override_p = local_override_val if local_override_val else db_override_val
 
-            if st.session_state[pitcher_key] is None:
-                st.session_state[pitcher_key] = final_override_p if final_override_p else predicted
+            if local_override_val:
+                final_pitcher = local_override_val
+                pitcher_source = "로컬 적용"
+            elif is_official:
+                final_pitcher = predicted
+                pitcher_source = "오피셜"
+            elif db_override_val:
+                final_pitcher = db_override_val
+                pitcher_source = "DB 공식"
+            else:
+                final_pitcher = predicted
+                pitcher_source = "자동 예측"
+
+            # 🔥 현재 세션에 선택된 투수가 없거나, 우선순위가 바뀌면 자동 갱신
+            current_pitcher = st.session_state.get(pitcher_key)
+            if current_pitcher != final_pitcher:
+                st.session_state[pitcher_key] = final_pitcher
 
             show_pitcher = st.session_state[pitcher_key]
 
@@ -584,10 +612,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
 
-            # 🔥 지정 여부와 상관없이 선발투수 로테이션 블록을 항상 그리도록 분기 제거!
-            if final_override_p:
-                src_text = "로컬 적용" if local_override_val else "DB 공식"
-                st.info(f"👉 지정됨 ({src_text}): 🎯 {show_pitcher}")
+            if pitcher_source in ["로컬 적용", "DB 공식"]:
+                st.info(f"👉 지정됨 ({pitcher_source}): 🎯 {show_pitcher}")
+            elif pitcher_source == "오피셜":
+                st.success(f"✅ 오피셜 발표: {show_pitcher}")
+            elif pitcher_source == "자동 예측":
+                st.caption(f"🎯 자동 예측 선발: {show_pitcher}")
 
             st.markdown('<div class="sec-label">🎯 선발투수 로테이션 현황</div>', unsafe_allow_html=True)
             
