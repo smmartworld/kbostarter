@@ -729,42 +729,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
-                stat_html = f"""
-                <div style="
-                    margin:8px 0 4px 0;
-                    display:flex;
-                    gap:6px;
-                    flex-wrap:wrap;
-                ">
-
-                    <span class="stat-badge">
-                        선발등판 <b>{s["등판"]}회</b>
-                    </span>
-
-                    <span class="stat-badge" style="
-                        background:#ebf8ff;
-                        color:#1a365d;
-                        font-weight:800;
-                    ">
-                        ERA <b>{s["ERA"]}</b>
-                    </span>
-
-                    <span class="stat-badge" style="
-                        background:#fff5f5;
-                        color:#822727;
-                        font-weight:800;
-                    ">
-                        WHIP <b>{s["WHIP"]}</b>
-                    </span>
-
-                    <span class="stat-badge">
-                        이닝 <b>{s["총이닝"]}</b>
-                    </span>
-
-                </div>
-                """
-
-                st.markdown(stat_html, unsafe_allow_html=True)           
+                st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+                if 'WHIP' in s:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
@@ -777,52 +746,14 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     hide_index=True, 
                     use_container_width=True,
                     column_config={
-
-                        "날짜": st.column_config.TextColumn(
-                            "날짜",
-                            width="small"
-                        ),
-
-                        "상대팀": st.column_config.TextColumn(
-                            "상대팀",
-                            width="small"
-                        ),
-
-                        "이닝": st.column_config.TextColumn(
-                            "이닝",
-                            width="small"
-                        ),
-
-                        "자책점": st.column_config.NumberColumn(
-                            "자책",
-                            format="%d",
-                            width="small"
-                        ),
-
-                        "피안타": st.column_config.NumberColumn(
-                            "피안타",
-                            format="%d",
-                            width="small"
-                        ),
-
-                        "사사구": st.column_config.NumberColumn(
-                            "사사구",
-                            format="%d",
-                            width="small"
-                        ),
-
-                        "투구수": st.column_config.NumberColumn(
-                            "투구수",
-                            format="%d",
-                            width="small"
-                        ),
-
-                        "휴식일": st.column_config.NumberColumn(
-                            "휴식",
-                            format="%d",
-                            width="small"
-                        )
-
+                        "날짜": st.column_config.TextColumn("날짜", alignment="center"),
+                        "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
+                        "이닝": st.column_config.TextColumn("이닝", alignment="center"),
+                        "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
+                        "피안타": st.column_config.NumberColumn("피안타", format="%d", alignment="center"),
+                        "사사구": st.column_config.NumberColumn("사사구", format="%d", alignment="center"),
+                        "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
+                        "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                     }
                 )
             else: 
@@ -838,52 +769,13 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 hide_index=True, 
                 use_container_width=True,
                 column_config={
-
-                    "날짜": st.column_config.TextColumn(
-                        "날짜",
-                        width="small"
-                    ),
-
-                    "상대팀": st.column_config.TextColumn(
-                        "상대팀",
-                        width="small"
-                    ),
-
-                    "이닝": st.column_config.TextColumn(
-                        "이닝",
-                        width="small"
-                    ),
-
-                    "자책점": st.column_config.NumberColumn(
-                        "자책",
-                        format="%d",
-                        width="small"
-                    ),
-
-                    "피안타": st.column_config.NumberColumn(
-                        "피안타",
-                        format="%d",
-                        width="small"
-                    ),
-
-                    "사사구": st.column_config.NumberColumn(
-                        "사사구",
-                        format="%d",
-                        width="small"
-                    ),
-
-                    "투구수": st.column_config.NumberColumn(
-                        "투구수",
-                        format="%d",
-                        width="small"
-                    ),
-
-                    "휴식일": st.column_config.NumberColumn(
-                        "휴식",
-                        format="%d",
-                        width="small"
-                    )
-
+                    "날짜": st.column_config.TextColumn("날짜", alignment="center"),
+                    "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
+                    "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
+                    "이닝": st.column_config.TextColumn("이닝", alignment="center"),
+                    "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
+                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
+                    "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
                 }
             )
 
