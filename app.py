@@ -722,18 +722,15 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
-                    # 🔥 [NEW] disabled=is_absent 옵션을 추가해서 휴식 중인 투수는 클릭 불가능한 회색 버튼으로 디밍 처리!
                     if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True, disabled=is_absent):
-                        # 만약 수동 지정 상태인데 다른 버튼을 누르면 풀리게 하려면 여기서 override 초기화 로직을 넣어도 돼!
                         st.session_state[pitcher_key] = pname; st.rerun()
 
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
-                st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">등판 <b>{s["등판"]}회</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
                 if 'WHIP' in s:
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span></div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
@@ -749,11 +746,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         "날짜": st.column_config.TextColumn("날짜", alignment="center"),
                         "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
                         "이닝": st.column_config.TextColumn("이닝", alignment="center"),
-                        "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
-                        "피안타": st.column_config.NumberColumn("피안타", format="%d", alignment="center"),
-                        "사사구": st.column_config.NumberColumn("사사구", format="%d", alignment="center"),
-                        "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
-                        "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
+                        "자책점": st.column_config.TextColumn("자책점", alignment="center"),
+                        "피안타": st.column_config.TextColumn("피안타", alignment="center"),
+                        "사사구": st.column_config.TextColumn("사사구", alignment="center"),
+                        "투구수": st.column_config.TextColumn("투구수", alignment="center"),
+                        "휴식일": st.column_config.TextColumn("휴식일", alignment="center")
                     }
                 )
             else: 
@@ -773,9 +770,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     "상대팀": st.column_config.TextColumn("상대팀", alignment="center"),
                     "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
                     "이닝": st.column_config.TextColumn("이닝", alignment="center"),
-                    "자책점": st.column_config.NumberColumn("자책점", format="%d", alignment="center"),
-                    "투구수": st.column_config.NumberColumn("투구수", format="%d", alignment="center"),
-                    "휴식일": st.column_config.NumberColumn("휴식일", format="%d", alignment="center")
+                    "자책점": st.column_config.TextColumn("자책점", alignment="center"),
+                    "피안타": st.column_config.TextColumn("피안타", alignment="center"),
+                    "사사구": st.column_config.TextColumn("사사구", alignment="center"),
+                    "투구수": st.column_config.TextColumn("투구수", alignment="center"),
+                    "휴식일": st.column_config.TextColumn("휴식일", alignment="center")
                 }
             )
 
