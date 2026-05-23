@@ -169,7 +169,7 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
 
     # 🔥 최근 5경기 줄 수 고정
     while len(recent) < n:
-        recent.loc[len(recent)] = ['', '', '', '', '', '', '', '']
+        recent.loc[len(recent)] = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ']
 
     return recent
 
@@ -259,6 +259,6 @@ def get_recent_rotation_list(df, team, target_date, n=10):
     
     # 🔥 5줄 고정 맞춤
     while len(recent) < n:
-        recent.loc[len(recent)] = ['', '', '', '', '', '', '', '']
+        recent.loc[len(recent)] = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ']
 
     return recent

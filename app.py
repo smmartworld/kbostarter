@@ -758,9 +758,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
                 </div>
                 """, unsafe_allow_html=True)                
-                
-                else:
-                    st.markdown(f'<div style="margin:2px 0;"><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span></div>', unsafe_allow_html=True)
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
