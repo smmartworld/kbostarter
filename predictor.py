@@ -165,7 +165,13 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
     for col in ['투구수', '피안타', '사사구', '자책점']:
         recent[col] = pd.to_numeric(recent[col], errors='coerce').fillna(0).astype(int)
 
-    return recent[['날짜', '상대팀', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
+    recent = recent[['날짜', '상대팀', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
+
+    # 🔥 최근 5경기 줄 수 고정
+    while len(recent) < n:
+        recent.loc[len(recent)] = ['-', '-', '-', '-', '-', '-', '-', '-']
+
+    return recent
 
 def get_season_stats(df, pitcher_name, target_date):
     target_dt = pd.to_datetime(target_date)

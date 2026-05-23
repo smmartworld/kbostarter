@@ -10,7 +10,7 @@ from predictor import (
     get_recent_rotation_list, TEAM_COLORS
 )
 
-st.set_page_config(page_title="⚾선발누구⚾", page_icon="⚾", layout="wide")
+st.set_page_config(page_title="선발누구⚾", page_icon="⚾", layout="wide")
 
 st.markdown("""
 <style>
