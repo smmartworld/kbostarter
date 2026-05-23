@@ -10,7 +10,7 @@ from predictor import (
     get_recent_rotation_list, TEAM_COLORS
 )
 
-st.set_page_config(page_title="⚾ KBO 선발 예측기", page_icon="⚾", layout="wide")
+st.set_page_config(page_title="⚾선발누구⚾", page_icon="⚾", layout="wide")
 
 st.markdown("""
 <style>
@@ -123,7 +123,7 @@ _defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4)
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
-st.markdown('<div class="main-title">⚾ KBO 선발 예측기</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">⚾선발누구⚾</div>', unsafe_allow_html=True)
 
 col_a, col_b, col_c = st.columns([1, 2, 1])
 
@@ -205,7 +205,7 @@ if show_admin:
             for i, row in db_df.iterrows():
                 t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
                 # 🔥 [NEW] 뱃지 아이콘 분기
-                icon = "🎯" if typ == "선발 지정" else ("🚑" if typ == "휴식/말소" else "🚫")
+                icon = "🎯" if typ == "선발 지정" else ("⏸️" if typ == "휴식/말소" else "🚫")
                 dc1, dc2 = st.columns([4, 1])
                 with dc1:
                     if typ == "로테이션 제외":
@@ -240,7 +240,12 @@ for (team, dt_str), pitcher in db_overrides.items():
     dt_pd = pd.to_datetime(dt_str)
     mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
     if mask.any():
+
         current_status = working_df.loc[mask, '상태'].values[0]
+
+        # 🔥 종료 경기면 실제 데이터 우선
+        if current_status == '종료':
+            continue
         current_pitcher = working_df.loc[mask, '선발투수'].values[0]
         
         # 이미 현실 KBO 오피셜 선발투수가 나온 상태('예정'이면서 투수가 있는 경우)라면 DB 지정을 패스!
@@ -489,7 +494,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             with t_col1:
                 use_manual = st.toggle(f"🛠️ 수동 지정", value=(local_override_val is not None), key=f"man_{team}_{dt_str}")
             with t_col2:
-                use_absence = st.toggle(f"🏥 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
+                use_absence = st.toggle(f"⏸️ 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
             with t_col3:
                 # 🔥 expanded_cancels를 확인해서 상대팀이 우취됐어도 토글이 같이 켜지게 만듦!
                 is_cancelled = (team, dt_str) in expanded_cancels
@@ -594,16 +599,16 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_color = TEAM_COLORS.get(team, "#4a5568")
 
             if pitcher_source == "로컬 적용":
-                s_icon, s_text, s_color = "🏠", f"로컬: {show_pitcher}", "#2b6cb0"
+                s_icon, s_text, s_color = "🧪", f"로컬: {show_pitcher}", "#2b6cb0"
 
             elif pitcher_source == "DB 공식":
-                s_icon, s_text, s_color = "🏢", f"DB: {show_pitcher}", "#c05621"
+                s_icon, s_text, s_color = "📌", f"DB: {show_pitcher}", "#c05621"
 
             elif pitcher_source == "오피셜":
                 s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a"
 
             else:
-                s_icon, s_text, s_color = "🤖", f"예측: {show_pitcher}", "#4a5568"
+                s_icon, s_text, s_color = "🤖", f"자동 예측: {show_pitcher}", "#4a5568"
 
             info_badges = []
 
@@ -623,7 +628,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
                     if selected_dt.date() < ret_dt:
                         info_badges.append(
-                            f"<span style='color:#d69e2e; font-weight:700;'>🚑 {p}(~{ret_dt.strftime('%m/%d')})</span>"
+                            f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>"
                         )
 
                 if p in team_db_excluded:
@@ -708,7 +713,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     if is_absent:
                         # 휴식 중이면 텍스트를 바꾸고, 아래 st.button에서 disabled 처리
                         return_date_str = combined_absences[pname].strftime('%m/%d')
-                        btn_text = f"🏥 휴식중\n{pname}\n({return_date_str} 복귀)"
+                        btn_text = f"{pname}\n({return_date_str} 복귀)"
                     elif pname == predicted:
                         if is_official:
                             btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
@@ -778,4 +783,4 @@ render_team_panel(left_col, away_team, 'pitcher_away', is_away=True)
 render_team_panel(right_col, home_team, 'pitcher_home', is_away=False)
 
 st.divider()
-st.markdown('<div style="text-align:center; color:#a0aec0; font-size:0.78rem;">⚾ KBO 선발 예측기 &nbsp;|&nbsp; 데이터: KBO 공식 / 네이버 스포츠</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center; color:#a0aec0; font-size:0.78rem;">⚾선발누구⚾ &nbsp;|&nbsp; 데이터: KBO 공식 / 네이버 스포츠</div>', unsafe_allow_html=True)
