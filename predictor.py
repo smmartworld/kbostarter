@@ -169,7 +169,7 @@ def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
 
     # 🔥 최근 5경기 줄 수 고정
     while len(recent) < n:
-        recent.loc[len(recent)] = ['-', '-', '-', '-', '-', '-', '-', '-']
+        recent.loc[len(recent)] = ['', '', '', '', '', '', '', '']
 
     return recent
 
@@ -252,13 +252,13 @@ def get_recent_rotation_list(df, team, target_date, n=10):
     recent['휴식일'] = rest_days_list
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
     
-    for c in ['투구수', '자책점']:
+    for c in ['투구수', '자책점', '피안타', '사사구']:
         recent[c] = pd.to_numeric(recent[c], errors='coerce').fillna(0).astype(int)
 
     recent = recent[['날짜', '상대팀', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
 
     # 🔥 5줄 고정 맞춤
     while len(recent) < n:
-        recent.loc[len(recent)] = ['-', '-', '-', '-', '-', '-', '-', '-']
+        recent.loc[len(recent)] = ['', '', '', '', '', '', '', '']
 
     return recent
