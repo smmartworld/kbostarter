@@ -92,7 +92,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 STADIUMS = {
-    'LG': '잠실', '두산': '잠실', '키움': '고척', 'SSG': '문학', 
+    'LG': '잠실', '두산': '잠실', '키움': '고척', 'SSG': '인천', 
     'KT': '수원', '한화': '대전', '삼성': '대구', '롯데': '부산', 'NC': '창원', 'KIA': '광주'
 }
 
@@ -550,7 +550,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             st.markdown(f'<span class="stat-badge">당일 이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">당일 자책 <b>{r["자책점"]}</b></span><span class="stat-badge">당일 투구 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
             
             s = get_season_stats(working_df, show_pitcher, selected_dt)
-            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["선발"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
         else:
             dt_str = selected_dt.strftime('%Y-%m-%d')
             local_override_val = st.session_state.overrides.get((team, dt_str))
@@ -798,7 +798,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 
                 # ── 1행: 기본 스탯 (등판, ERA, 이닝, WHIP) ──────────────────────
                 row1_html = (
-                    f'<div class="border-badge border-gray"><div class="bb-label">등판</div><div class="bb-value">{s["등판"]}회</div></div>'
+                    f'<div class="border-badge border-gray"><div class="bb-label">선발</div><div class="bb-value">{s["선발"]}회</div></div>'
                     f'<div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s["ERA"]}</div></div>'
                     f'<div class="border-badge border-gray"><div class="bb-label">이닝</div><div class="bb-value">{s["총이닝"]}</div></div>'
                     f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
