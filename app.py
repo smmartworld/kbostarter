@@ -63,11 +63,11 @@ st.markdown("""
     .border-badge {
         display: flex; flex-direction: column; justify-content: center;
         background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
-        padding: 2px 8px; height: 38px; box-sizing: border-box;
+        padding: 2px 8px; height: 44px; box-sizing: border-box;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
-    .border-badge .bb-label { font-size: 0.68rem; font-weight: 700; color: #718096; margin-bottom: 1px; }
-    .border-badge .bb-value { font-size: 0.82rem; font-weight: 800; color: #1a202c; }
+    .border-badge .bb-label { font-size: 0.73rem; font-weight: 700; color: #718096; margin-bottom: 1px; }
+    .border-badge .bb-value { font-size: 0.95rem; font-weight: 800; color: #1a202c; }
 
     .border-gray   { border-left: 4px solid #cbd5e0; } /* 기본 정보 (회색) */
     .border-red    { border-left: 4px solid #f56565; } /* 실점 관련 (옅은 적색) */
