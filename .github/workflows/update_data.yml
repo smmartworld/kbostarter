@@ -25,10 +25,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas beautifulsoup4
+        pip install requests pandas beautifulsoup4 lxml
 
-    - name: Run data crawler
+    - name: Run KBO data crawler
       run: python data.py
+
+    - name: Run pitcher advanced stats collector
+      # Naver API(WAR/K%/BB%) + Statiz(FIP) 통합 수집
+      # 실패해도 기존 pitcher_advanced_stats.csv 보존 (앱 안전)
+      run: python naver_stats.py || echo "⚠️ 심화 스탯 수집 실패 - 기존 데이터 유지"
+      continue-on-error: true
 
     - name: Commit and push changes
       run: |
@@ -39,4 +45,6 @@ jobs:
         git pull origin main --rebase || echo "No changes to pull"
         
         git add 로테이션_마스터데이터.csv
+        # statiz_stats.csv도 변경됐을 때만 커밋에 포함
+        git add pitcher_advanced_stats.csv 2>/dev/null || true
         git diff --quiet && git diff --staged --quiet || (git commit -m "⚾ KBO 데이터 자동 업데이트 완료!" && git push origin HEAD:main)
