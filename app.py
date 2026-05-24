@@ -771,8 +771,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     "선발투수": st.column_config.TextColumn("선발투수", alignment="center"),
                     "이닝": st.column_config.TextColumn("이닝", alignment="center"),
                     "자책점": st.column_config.TextColumn("자책점", alignment="center"),
-                    "피안타": st.column_config.TextColumn("피안타", alignment="center"),
-                    "사사구": st.column_config.TextColumn("사사구", alignment="center"),
                     "투구수": st.column_config.TextColumn("투구수", alignment="center"),
                     "휴식일": st.column_config.TextColumn("휴식일", alignment="center")
                 }

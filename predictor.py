@@ -251,13 +251,13 @@ def get_recent_rotation_list(df, team, target_date, n=10):
 
     recent['휴식일'] = rest_days_list
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
-    
-    for c in ['투구수', '자책점', '피안타', '사사구']:
+
+    for c in ['투구수', '자책점']:
         recent[c] = pd.to_numeric(recent[c], errors='coerce').fillna(0).astype(int)
 
-    recent = recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
+    recent = recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '투구수', '휴식일']].reset_index(drop=True)
 
     while len(recent) < n:
-        recent.loc[len(recent)] = ['', '', '', '', '', '', '', '', '']
+        recent.loc[len(recent)] = ['', '', '', '', '', '', '']
 
     return recent
