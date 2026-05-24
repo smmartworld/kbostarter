@@ -728,7 +728,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
                 if 'WHIP' in s:
-                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span><span class="stat-badge" style="background:#eebfbb; color:#820024;">WHIP <b>{s["WHIP"]}</b></span></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span><span class="stat-badge">WHIP <b>{s["WHIP"]}</b></span></div>', unsafe_allow_html=True)
                 else:
                     st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
 
