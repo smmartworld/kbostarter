@@ -63,7 +63,7 @@ st.markdown("""
     .border-badge {
         display: flex; 
         flex-direction: row; /* 🔥 가로 배치로 변경! */
-        gap: 8px;
+        gap: 12px;
         align-items: center; /* 수직 중앙 정렬 */
         background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
         padding: 6px 12px; /* 좌우 여백을 넓혀서 시원하게 */
@@ -71,8 +71,8 @@ st.markdown("""
         box-sizing: border-box;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
-    .border-badge .bb-label { font-size: 0.75rem; font-weight: 700; color: #718096; margin-bottom: 0; }
-    .border-badge .bb-value { font-size: 0.95rem; font-weight: 800; color: #1a202c; }
+    .border-badge .bb-label { font-size: 0.75rem; font-weight: 700; color: #718096; margin: 0; line-height: 1; }
+    .border-badge .bb-value { font-size: 0.95rem; font-weight: 800; color: #1a202c; margin: 0; line-height: 1; }
 
     .border-gray   { border-left: 4px solid #cbd5e0; } /* 기본 정보 (회색) */
     .border-red    { border-left: 4px solid #f56565; } /* 실점 관련 (옅은 적색) */
