@@ -799,8 +799,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
                 adv = get_advanced_stats(show_pitcher)
-
-                # (기존 코드) adv = get_advanced_stats(show_pitcher) 바로 아래에 붙여넣기!
+                # (기존 코드) adv = get_advanced_stats(show_pitcher) 바로 아래 공간
 
                 # ── 1행: 기본 스탯 (등판 era 이닝 whip 순서) ──────────────────────
                 whip_val = s.get("WHIP", "-")
@@ -825,8 +824,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 </div>
                 """
 
-                # ── 2행: 심화 스탯 (war fip k bb 순서 / 출처 텍스트 삭제) ──────────────────────
+                # ── 2행: 심화 스탯 (war fip k bb 순서) ──────────────────────
                 has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
+                
                 if has_adv:
                     row2_html = f"""
                     <div class="pitcher-stat-grid" style="margin-top: 6px; margin-bottom: 6px;">
@@ -848,8 +848,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         </div>
                     </div>
                     """
+                    # ⚠️ row1과 row2를 합쳐서 Streamlit 마크다운으로 강제 출력!
                     st.markdown(row1_html + row2_html, unsafe_allow_html=True)
                 else:
+                    # 심화 스탯이 없는 투수면 1행만 출력!
                     st.markdown(row1_html, unsafe_allow_html=True)
 
         # (기존 코드) st.divider()가 이 아래에 자연스럽게 이어지면 성공이야!
