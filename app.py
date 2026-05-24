@@ -30,7 +30,7 @@ st.markdown("""
         .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 100% !important; }
         .cal-wrap div[data-testid="column"] { min-width: 45px !important; width: 14% !important; flex: 1 1 auto !important; }
         div[data-testid="stButton"] button { padding: 0.1rem 0 !important; font-size: 0.7rem; min-height: 40px !important; }
-    }splay: inline-block; background: #edf2f7
+    }
 
     .cal-nav-title { text-align: center; font-size: 1.15rem; font-weight: 800; color: #2d3748; padding: 4px 0; }
     .cal-day-name { text-align: center; font-size: 0.78rem; font-weight: 700; color: #718096; padding: 8px 0 4px 0; }
@@ -840,11 +840,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         </div>
                         <div class="border-badge border-blue">
                             <span class="bb-label">K%</span>
-                            <span class="bb-value">{adv["K%"]}%</span>
+                            <span class="bb-value">{adv["K%"]}</span>
                         </div>
                         <div class="border-badge border-blue">
                             <span class="bb-label">BB%</span>
-                            <span class="bb-value">{adv["BB%"]}%</span>
+                            <span class="bb-value">{adv["BB%"]}</span>
                         </div>
                     </div>
                     """
