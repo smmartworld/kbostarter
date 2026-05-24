@@ -818,7 +818,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     )
                 else:
                     st.markdown(
-                        f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}</div>', 
+                        f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>', 
                         unsafe_allow_html=True
                     )
 
