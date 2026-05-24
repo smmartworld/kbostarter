@@ -792,12 +792,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 whip_val = s["WHIP"] if 'WHIP' in s else "-"
                 
                 # ── 1행: 기본 스탯 (등판, ERA, 이닝, WHIP) ──────────────────────
-                row1_html = f'''
-                    <div class="border-badge border-gray"><div class="bb-label">등판</div><div class="bb-value">{s["등판"]}회</div></div>
-                    <div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s["ERA"]}</div></div>
-                    <div class="border-badge border-gray"><div class="bb-label">이닝</div><div class="bb-value">{s["총이닝"]}</div></div>
-                    <div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>
-                '''
+                row1_html = (
+                    f'<div class="border-badge border-gray"><div class="bb-label">등판</div><div class="bb-value">{s["등판"]}회</div></div>'
+                    f'<div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s["ERA"]}</div></div>'
+                    f'<div class="border-badge border-gray"><div class="bb-label">이닝</div><div class="bb-value">{s["총이닝"]}</div></div>'
+                    f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
+                )
 
                 # ── 2행: 심화 스탯 (WAR, FIP, K%, BB%) ─────────────────────────
                 has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
@@ -805,12 +805,12 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     k_val = f'{adv["K%"]}%' if adv["K%"] != '-' else '-'
                     bb_val = f'{adv["BB%"]}%' if adv["BB%"] != '-' else '-'
                     
-                    row2_html = f'''
-                        <div class="border-badge border-green"><div class="bb-label">WAR</div><div class="bb-value">{adv["WAR"]}</div></div>
-                        <div class="border-badge border-red"><div class="bb-label">FIP</div><div class="bb-value">{adv["FIP"]}</div></div>
-                        <div class="border-badge border-blue"><div class="bb-label">K%</div><div class="bb-value">{k_val}</div></div>
-                        <div class="border-badge border-blue"><div class="bb-label">BB%</div><div class="bb-value">{bb_val}</div></div>
-                    '''
+                    row2_html = (
+                        f'<div class="border-badge border-green"><div class="bb-label">WAR</div><div class="bb-value">{adv["WAR"]}</div></div>'
+                        f'<div class="border-badge border-red"><div class="bb-label">FIP</div><div class="bb-value">{adv["FIP"]}</div></div>'
+                        f'<div class="border-badge border-blue"><div class="bb-label">K%</div><div class="bb-value">{k_val}</div></div>'
+                        f'<div class="border-badge border-blue"><div class="bb-label">BB%</div><div class="bb-value">{bb_val}</div></div>'
+                    )
                     st.markdown(
                         f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>'
                         f'<div style="font-size:0.68rem;color:#a0aec0;margin-left:4px;margin-bottom:6px;">WAR·K%·BB% via Naver / FIP via Statiz</div>', 
