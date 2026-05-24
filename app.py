@@ -30,7 +30,7 @@ st.markdown("""
         .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 100% !important; }
         .cal-wrap div[data-testid="column"] { min-width: 45px !important; width: 14% !important; flex: 1 1 auto !important; }
         div[data-testid="stButton"] button { padding: 0.1rem 0 !important; font-size: 0.7rem; min-height: 40px !important; }
-    }
+    }splay: inline-block; background: #edf2f7
 
     .cal-nav-title { text-align: center; font-size: 1.15rem; font-weight: 800; color: #2d3748; padding: 4px 0; }
     .cal-day-name { text-align: center; font-size: 0.78rem; font-weight: 700; color: #718096; padding: 8px 0 4px 0; }
@@ -70,6 +70,30 @@ st.markdown("""
     .absence-badge-drop { background: #edf2f7; border: 1px solid #e2e8f0; color: #718096; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     
     .admin-panel { background: #fffaf0; border: 2px solid #fbd38d; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; }
+
+    .pitcher-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; box-sizing: border-box; }
+    
+    .border-badge {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 2px 8px;
+        height: 38px;
+        box-sizing: border-box;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .border-badge .bb-label { font-size: 0.68rem; font-weight: 700; color: #718096; margin-bottom: 1px; }
+    .border-badge .bb-value { font-size: 0.82rem; font-weight: 800; color: #1a202c; }
+
+    .border-gray   { border-left: 4px solid #cbd5e0; }
+    .border-red    { border-left: 4px solid #f56565; }
+    .border-blue   { border-left: 4px solid #4299e1; }
+    .border-green  { border-left: 4px solid #48bb78; }
+            
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -776,45 +800,59 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
                 adv = get_advanced_stats(show_pitcher)
 
-                # ── 1행: 기본 스탯 (등판/이닝/ERA/WHIP) ──────────────────────
-                if 'WHIP' in s:
-                    basic_html = (
-                        f'<span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span>'
-                        f'<span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span>'
-                        f'<span class="stat-badge">ERA <b>{s["ERA"]}</b></span>'
-                        f'<span class="stat-badge">WHIP <b>{s["WHIP"]}</b></span>'
-                    )
-                else:
-                    basic_html = (
-                        f'<span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span>'
-                        f'<span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span>'
-                        f'<span class="stat-badge">ERA <b>{s["ERA"]}</b></span>'
-                    )
+                # (기존 코드) adv = get_advanced_stats(show_pitcher) 바로 아래에 붙여넣기!
 
-                # ── 2행: 심화 스탯 (WAR/FIP/K%/BB%) ─────────────────────────
-                # WAR 또는 (K%와 BB%) 중 하나라도 있어야 2행 표시
-                # FIP만 '-'여도 Naver 스탯 있으면 표시, 전부 '-'이면 블록 안 뜸
+                # ── 1행: 기본 스탯 (등판 era 이닝 whip 순서) ──────────────────────
+                whip_val = s.get("WHIP", "-")
+                row1_html = f"""
+                <div class="pitcher-stat-grid" style="margin-top: 10px;">
+                    <div class="border-badge border-gray">
+                        <span class="bb-label">등판</span>
+                        <span class="bb-value">{s["등판"]}회</span>
+                    </div>
+                    <div class="border-badge border-red">
+                        <span class="bb-label">ERA</span>
+                        <span class="bb-value">{s["ERA"]}</span>
+                    </div>
+                    <div class="border-badge border-gray">
+                        <span class="bb-label">이닝</span>
+                        <span class="bb-value">{s["총이닝"]}</span>
+                    </div>
+                    <div class="border-badge border-blue">
+                        <span class="bb-label">WHIP</span>
+                        <span class="bb-value">{whip_val}</span>
+                    </div>
+                </div>
+                """
+
+                # ── 2행: 심화 스탯 (war fip k bb 순서 / 출처 텍스트 삭제) ──────────────────────
                 has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
                 if has_adv:
-                    adv_html = (
-                        f'<span class="stat-badge-adv stat-badge-war">WAR <b>{adv["WAR"]}</b></span>'
-                        f'<span class="stat-badge-adv stat-badge-fip">FIP <b>{adv["FIP"]}</b></span>'
-                        f'<span class="stat-badge-adv stat-badge-k9">K% <b>{adv["K%"]}%</b></span>'
-                        f'<span class="stat-badge-adv stat-badge-bb9">BB% <b>{adv["BB%"]}%</b></span>'
-                    )
-                    st.markdown(
-                        f'<div style="margin:8px 0 2px 0;">{basic_html}</div>'
-                        f'<div style="margin:2px 0 6px 0;">{adv_html}'
-                        f'<span style="font-size:0.68rem;color:#a0aec0;margin-left:4px;">'
-                        f'WAR·K%·BB% via Naver / FIP via Statiz</span>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
+                    row2_html = f"""
+                    <div class="pitcher-stat-grid" style="margin-top: 6px; margin-bottom: 6px;">
+                        <div class="border-badge border-green">
+                            <span class="bb-label">WAR</span>
+                            <span class="bb-value">{adv["WAR"]}</span>
+                        </div>
+                        <div class="border-badge border-red">
+                            <span class="bb-label">FIP</span>
+                            <span class="bb-value">{adv["FIP"]}</span>
+                        </div>
+                        <div class="border-badge border-blue">
+                            <span class="bb-label">K%</span>
+                            <span class="bb-value">{adv["K%"]}%</span>
+                        </div>
+                        <div class="border-badge border-blue">
+                            <span class="bb-label">BB%</span>
+                            <span class="bb-value">{adv["BB%"]}%</span>
+                        </div>
+                    </div>
+                    """
+                    st.markdown(row1_html + row2_html, unsafe_allow_html=True)
                 else:
-                    st.markdown(
-                        f'<div style="margin:8px 0 2px 0;">{basic_html}</div>',
-                        unsafe_allow_html=True
-                    )
+                    st.markdown(row1_html, unsafe_allow_html=True)
+
+        # (기존 코드) st.divider()가 이 아래에 자연스럽게 이어지면 성공이야!
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
