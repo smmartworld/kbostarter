@@ -32,12 +32,13 @@ OUTPUT_CSV  = "pitcher_advanced_stats.csv"
 SEASON      = 2026
 
 # 네이버 스포츠 API
+# pageSize=200: KBO 시즌 전체 투수 ~150명 이하, 루프 없이 한 번에 가져옴
 NAVER_URL = (
     "https://api-gw.sports.naver.com/statistics/categories/kbo"
     "/seasons/{season}/players"
     "?sortField=pitcherEra&sortDirection=asc"
     "&playerType=PITCHER&gameType=REGULAR_SEASON"
-    "&page={page}&pageSize=100"
+    "&page=1&pageSize=200"
 )
 
 # 스탯티즈 투수 스탯 (FIP 전용)
@@ -72,62 +73,43 @@ STATIZ_NAME_IDX = 1
 # ─── 1. 네이버 API: WAR / K% / BB% ───────────────────────────────────────────
 
 def fetch_naver_stats() -> pd.DataFrame | None:
-    """네이버 스포츠 API에서 전체 투수 시즌 스탯 수집."""
+    """네이버 스포츠 API에서 전체 투수 시즌 스탯 수집 (단일 요청)."""
     print("\n📡 [네이버] 투수 시즌 스탯 수집 중...")
-    all_players = []
-    page = 1
 
-    while True:
-        url = NAVER_URL.format(season=SEASON, page=page)
-        try:
-            resp = requests.get(url, headers=NAVER_HEADERS, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-        except Exception as e:
-            print(f"   ⚠️ 네이버 API 오류 (page {page}): {e}")
-            break
+    url = NAVER_URL.format(season=SEASON)
+    try:
+        resp = requests.get(url, headers=NAVER_HEADERS, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"   ❌ 네이버 API 요청 실패: {e}")
+        return None
 
-        if not data.get("success"):
-            print(f"   ⚠️ 네이버 API success=false")
-            break
+    if not data.get("success"):
+        print(f"   ❌ 네이버 API success=false")
+        return None
 
-        players = data.get("result", {}).get("seasonPlayerStats", [])
-        if not players:
-            break
-
-        all_players.extend(players)
-        print(f"   📄 page {page}: {len(players)}명 수집")
-
-        # pageSize(100)보다 적게 왔으면 마지막 페이지
-        if len(players) < 100:
-            break
-
-        page += 1
-        time.sleep(0.3)
-
-    if not all_players:
-        print("   ❌ 네이버 API에서 데이터를 가져오지 못했어")
+    players = data.get("result", {}).get("seasonPlayerStats", [])
+    if not players:
+        print("   ❌ 선수 데이터 없음")
         return None
 
     rows = []
-    for p in all_players:
+    for p in players:
         name = p.get("playerName", "").strip()
         if not name:
             continue
         rows.append({
             "선발투수": name,
-            # pitcherPaKkRate = PA 기준 삼진율 (예: 17.6 → "17.6%")
-            "K%":  p.get("pitcherPaKkRate"),
-            # pitcherPaBbRate = PA 기준 볼넷율 (예: 3.8 → "3.8%")
-            "BB%": p.get("pitcherPaBbRate"),
+            "K%":  p.get("pitcherPaKkRate"),   # PA 기준 삼진율 (예: 17.6)
+            "BB%": p.get("pitcherPaBbRate"),    # PA 기준 볼넷율 (예: 3.8)
             "WAR": p.get("pitcherWar"),
-            # WPA는 일단 수집만 (선발엔 노이즈 있지만 데이터는 챙겨둠)
-            "WPA": p.get("pitcherWpa"),
+            "WPA": p.get("pitcherWpa"),         # 보관용 (선발엔 노이즈 있음)
         })
 
     df = pd.DataFrame(rows)
     df = df.drop_duplicates(subset="선발투수", keep="first")
-    print(f"   ✅ 네이버 수집 완료: {len(df)}명")
+    print(f"   ✅ 네이버 수집 완료: {len(df)}명 (단일 요청)")
     return df
 
 

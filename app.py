@@ -792,7 +792,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     )
 
                 # ── 2행: 심화 스탯 (WAR/FIP/K%/BB%) ─────────────────────────
-                has_adv = any(v != '-' for v in adv.values())
+                # WAR 또는 (K%와 BB%) 중 하나라도 있어야 2행 표시
+                # FIP만 '-'여도 Naver 스탯 있으면 표시, 전부 '-'이면 블록 안 뜸
+                has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
                 if has_adv:
                     adv_html = (
                         f'<span class="stat-badge-adv stat-badge-war">WAR <b>{adv["WAR"]}</b></span>'
