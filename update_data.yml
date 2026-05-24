@@ -1,41 +1,50 @@
 name: KBO Data Auto Update
 
-# 1. 언제 이 로봇이 실행될까? (매일 한국시간 오전 6시)
 on:
   schedule:
-    - cron: '0 21 * * *' # UTC 기준 21시 = 한국 시간 오전 6시
-  workflow_dispatch: # 버튼 눌러서 수동 실행 가능하게!
+    # 매 2시간마다 17분에 실행 (예: 00:17, 02:17, 04:17 ...)
+    - cron: '56 */2 * * *'
+    
+  workflow_dispatch:
 
 jobs:
   update-kbo-data:
-    runs-on: ubuntu-latest # 로봇이 쓸 가상 컴퓨터 운영체제
+    runs-on: ubuntu-latest 
 
     steps:
-    # 1. 내 깃허브 창고에서 파일 가져오기
     - name: Checkout repository
-      uses: actions/checkout@v3
-
-    # 2. 파이썬 설치하기
-    - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/checkout@v4
       with:
-        python-version: '3.10' # 파이썬 버전 지정
+        fetch-depth: 0
 
-    # 3. 필요한 라이브러리(requests 등) 설치
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests pandas
+        pip install requests pandas beautifulsoup4 lxml
 
-    # 4. 크롤러 파이썬 파일 실행!!! (여기서 CSV가 새로 만들어짐)
-    - name: Run data crawler
+    - name: Run KBO data crawler
       run: python data.py
 
-    # 5. 새로 만들어진 CSV 파일을 내 깃허브 창고에 덮어쓰기! (Commit & Push)
+    - name: Run pitcher advanced stats collector
+      # Naver API(WAR/K%/BB%) + Statiz(FIP) 통합 수집
+      # 실패해도 기존 pitcher_advanced_stats.csv 보존 (앱 안전)
+      run: python naver_stats.py || echo "⚠️ 심화 스탯 수집 실패 - 기존 데이터 유지"
+      continue-on-error: true
+
     - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
+        
+        # 꼬임 방지를 위해 최신 코드 먼저 땡겨오기
+        git pull origin main --rebase || echo "No changes to pull"
+        
         git add 로테이션_마스터데이터.csv
-        # 변경된 사항이 없으면 에러 내지 말고 조용히 넘어가기
-        git diff --quiet && git diff --staged --quiet || (git commit -m "⚾ 매일 아침 KBO 데이터 자동 업데이트 완료!" && git push)
+        # statiz_stats.csv도 변경됐을 때만 커밋에 포함
+        git add pitcher_advanced_stats.csv 2>/dev/null || true
+        git diff --quiet && git diff --staged --quiet || (git commit -m "⚾ KBO 데이터 자동 업데이트 완료!" && git push origin HEAD:main)
