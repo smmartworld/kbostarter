@@ -813,7 +813,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     )
                     st.markdown(
                         f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>'
-                        f'<div style="font-size:0.68rem;color:#a0aec0;margin-left:4px;margin-bottom:6px;">WAR·K%·BB% via Naver / FIP via Statiz</div>', 
                         unsafe_allow_html=True
                     )
                 else:
