@@ -56,11 +56,24 @@ st.markdown("""
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
-    .stat-badge-adv { display: inline-block; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; margin: 2px 3px 2px 0; white-space: nowrap; }
-    .stat-badge-war  { background: #e6fffa; color: #234e52; border: 1px solid #81e6d9; }
-    .stat-badge-k9   { background: #ebf8ff; color: #2a4365; border: 1px solid #90cdf4; }
-    .stat-badge-bb9  { background: #fffaf0; color: #744210; border: 1px solid #fbd38d; }
-    .stat-badge-fip  { background: #fff5f5; color: #742a2a; border: 1px solid #feb2b2; }
+    
+    /* 🔥 새로 추가된 투수 스탯 그리드 & 보더 뱃지 스타일 */
+    .pitcher-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; box-sizing: border-box; }
+    
+    .border-badge {
+        display: flex; flex-direction: column; justify-content: center;
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
+        padding: 2px 8px; height: 38px; box-sizing: border-box;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    .border-badge .bb-label { font-size: 0.68rem; font-weight: 700; color: #718096; margin-bottom: 1px; }
+    .border-badge .bb-value { font-size: 0.82rem; font-weight: 800; color: #1a202c; }
+
+    .border-gray   { border-left: 4px solid #cbd5e0; } /* 기본 정보 (회색) */
+    .border-red    { border-left: 4px solid #f56565; } /* 실점 관련 (옅은 적색) */
+    .border-blue   { border-left: 4px solid #4299e1; } /* 제구 관련 (옅은 청색) */
+    .border-green  { border-left: 4px solid #48bb78; } /* 종합 체급 (옅은 초록색) */
+
     div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
     div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
     .nav-button-container div[data-testid="stButton"] button { min-height: 40px !important; padding: 4px 8px !important; }
@@ -70,30 +83,6 @@ st.markdown("""
     .absence-badge-drop { background: #edf2f7; border: 1px solid #e2e8f0; color: #718096; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     
     .admin-panel { background: #fffaf0; border: 2px solid #fbd38d; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; }
-
-    .pitcher-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; box-sizing: border-box; }
-    
-    .border-badge {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
-        padding: 2px 8px;
-        height: 38px;
-        box-sizing: border-box;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-    }
-    .border-badge .bb-label { font-size: 0.68rem; font-weight: 700; color: #718096; margin-bottom: 1px; }
-    .border-badge .bb-value { font-size: 0.82rem; font-weight: 800; color: #1a202c; }
-
-    .border-gray   { border-left: 4px solid #cbd5e0; }
-    .border-red    { border-left: 4px solid #f56565; }
-    .border-blue   { border-left: 4px solid #4299e1; }
-    .border-green  { border-left: 4px solid #48bb78; }
-            
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -799,62 +788,40 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
                 adv = get_advanced_stats(show_pitcher)
-                # (기존 코드) adv = get_advanced_stats(show_pitcher) 바로 아래 공간
 
-                # ── 1행: 기본 스탯 (등판 era 이닝 whip 순서) ──────────────────────
-                whip_val = s.get("WHIP", "-")
-                row1_html = f"""
-                <div class="pitcher-stat-grid" style="margin-top: 10px;">
-                    <div class="border-badge border-gray">
-                        <span class="bb-label">등판</span>
-                        <span class="bb-value">{s["등판"]}회</span>
-                    </div>
-                    <div class="border-badge border-red">
-                        <span class="bb-label">ERA</span>
-                        <span class="bb-value">{s["ERA"]}</span>
-                    </div>
-                    <div class="border-badge border-gray">
-                        <span class="bb-label">이닝</span>
-                        <span class="bb-value">{s["총이닝"]}</span>
-                    </div>
-                    <div class="border-badge border-blue">
-                        <span class="bb-label">WHIP</span>
-                        <span class="bb-value">{whip_val}</span>
-                    </div>
-                </div>
-                """
-
-                # ── 2행: 심화 스탯 (war fip k bb 순서) ──────────────────────
-                has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
+                whip_val = s["WHIP"] if 'WHIP' in s else "-"
                 
-                if has_adv:
-                    row2_html = f"""
-                    <div class="pitcher-stat-grid" style="margin-top: 6px; margin-bottom: 6px;">
-                        <div class="border-badge border-green">
-                            <span class="bb-label">WAR</span>
-                            <span class="bb-value">{adv["WAR"]}</span>
-                        </div>
-                        <div class="border-badge border-red">
-                            <span class="bb-label">FIP</span>
-                            <span class="bb-value">{adv["FIP"]}</span>
-                        </div>
-                        <div class="border-badge border-blue">
-                            <span class="bb-label">K%</span>
-                            <span class="bb-value">{adv["K%"]}</span>
-                        </div>
-                        <div class="border-badge border-blue">
-                            <span class="bb-label">BB%</span>
-                            <span class="bb-value">{adv["BB%"]}</span>
-                        </div>
-                    </div>
-                    """
-                    # ⚠️ row1과 row2를 합쳐서 Streamlit 마크다운으로 강제 출력!
-                    st.markdown(row1_html + row2_html, unsafe_allow_html=True)
-                else:
-                    # 심화 스탯이 없는 투수면 1행만 출력!
-                    st.markdown(row1_html, unsafe_allow_html=True)
+                # ── 1행: 기본 스탯 (등판, ERA, 이닝, WHIP) ──────────────────────
+                row1_html = f'''
+                    <div class="border-badge border-gray"><div class="bb-label">등판</div><div class="bb-value">{s["등판"]}회</div></div>
+                    <div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s["ERA"]}</div></div>
+                    <div class="border-badge border-gray"><div class="bb-label">이닝</div><div class="bb-value">{s["총이닝"]}</div></div>
+                    <div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>
+                '''
 
-        # (기존 코드) st.divider()가 이 아래에 자연스럽게 이어지면 성공이야!
+                # ── 2행: 심화 스탯 (WAR, FIP, K%, BB%) ─────────────────────────
+                has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
+                if has_adv:
+                    k_val = f'{adv["K%"]}%' if adv["K%"] != '-' else '-'
+                    bb_val = f'{adv["BB%"]}%' if adv["BB%"] != '-' else '-'
+                    
+                    row2_html = f'''
+                        <div class="border-badge border-green"><div class="bb-label">WAR</div><div class="bb-value">{adv["WAR"]}</div></div>
+                        <div class="border-badge border-red"><div class="bb-label">FIP</div><div class="bb-value">{adv["FIP"]}</div></div>
+                        <div class="border-badge border-blue"><div class="bb-label">K%</div><div class="bb-value">{k_val}</div></div>
+                        <div class="border-badge border-blue"><div class="bb-label">BB%</div><div class="bb-value">{bb_val}</div></div>
+                    '''
+                    st.markdown(
+                        f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>'
+                        f'<div style="font-size:0.68rem;color:#a0aec0;margin-left:4px;margin-bottom:6px;">WAR·K%·BB% via Naver / FIP via Statiz</div>', 
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}</div>', 
+                        unsafe_allow_html=True
+                    )
+                    )
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
