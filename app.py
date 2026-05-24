@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import os
 import calendar as cal_module
 import time
 from datetime import date, timedelta
@@ -55,6 +56,11 @@ st.markdown("""
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
+    .stat-badge-adv { display: inline-block; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; margin: 2px 3px 2px 0; white-space: nowrap; }
+    .stat-badge-war  { background: #e6fffa; color: #234e52; border: 1px solid #81e6d9; }
+    .stat-badge-k9   { background: #ebf8ff; color: #2a4365; border: 1px solid #90cdf4; }
+    .stat-badge-bb9  { background: #fffaf0; color: #744210; border: 1px solid #fbd38d; }
+    .stat-badge-fip  { background: #fff5f5; color: #742a2a; border: 1px solid #feb2b2; }
     div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
     div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
     .nav-button-container div[data-testid="stButton"] button { min-height: 40px !important; padding: 4px 8px !important; }
@@ -87,6 +93,47 @@ try:
 except FileNotFoundError:
     st.error("❌ 데이터 파일 없음. data.py 먼저 실행 필요.")
     st.stop()
+
+# ── 스탯티즈 심화 스탯 로드 (없어도 앱은 정상 동작) ──────────────────────────
+@st.cache_data(ttl=3600)
+def load_advanced_stats() -> pd.DataFrame:
+    """pitcher_advanced_stats.csv 로드. 없으면 빈 DataFrame 반환."""
+    # 구버전 statiz_stats.csv도 fallback으로 읽음 (마이그레이션 대응)
+    for fname in ['pitcher_advanced_stats.csv', 'statiz_stats.csv']:
+        if not os.path.exists(fname):
+            continue
+        try:
+            df = pd.read_csv(fname)
+            for col in ['WAR', 'FIP', 'K%', 'BB%']:
+                if col not in df.columns:
+                    df[col] = None
+            return df
+        except Exception:
+            continue
+    return pd.DataFrame(columns=['선발투수', 'WAR', 'FIP', 'K%', 'BB%'])
+
+adv_stats_df = load_advanced_stats()
+
+def get_advanced_stats(pitcher_name: str) -> dict:
+    """투수 심화 스탯 조회. 없으면 '-' 반환."""
+    empty = {'WAR': '-', 'FIP': '-', 'K%': '-', 'BB%': '-'}
+    if adv_stats_df.empty:
+        return empty
+    row = adv_stats_df[adv_stats_df['선발투수'] == pitcher_name]
+    if row.empty:
+        return empty
+    r = row.iloc[0]
+    def fmt(val, decimals=2):
+        try:
+            return f"{float(val):.{decimals}f}" if pd.notna(val) else '-'
+        except (ValueError, TypeError):
+            return '-'
+    return {
+        'WAR': fmt(r.get('WAR'), 2),
+        'FIP': fmt(r.get('FIP'), 2),
+        'K%':  fmt(r.get('K%'),  1),
+        'BB%': fmt(r.get('BB%'), 1),
+    }
 
 def load_manager_data():
     try:
@@ -727,10 +774,45 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             if show_pitcher:
                 s = get_season_stats(working_df, show_pitcher, selected_dt)
+                adv = get_advanced_stats(show_pitcher)
+
+                # ── 1행: 기본 스탯 (등판/이닝/ERA/WHIP) ──────────────────────
                 if 'WHIP' in s:
-                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span><span class="stat-badge">WHIP <b>{s["WHIP"]}</b></span></div>', unsafe_allow_html=True)
+                    basic_html = (
+                        f'<span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span>'
+                        f'<span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span>'
+                        f'<span class="stat-badge">ERA <b>{s["ERA"]}</b></span>'
+                        f'<span class="stat-badge">WHIP <b>{s["WHIP"]}</b></span>'
+                    )
                 else:
-                    st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span><span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span><span class="stat-badge">ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+                    basic_html = (
+                        f'<span class="stat-badge">선발등판 <b>{s["등판"]}회</b></span>'
+                        f'<span class="stat-badge">이닝 <b>{s["총이닝"]}</b></span>'
+                        f'<span class="stat-badge">ERA <b>{s["ERA"]}</b></span>'
+                    )
+
+                # ── 2행: 심화 스탯 (WAR/FIP/K%/BB%) ─────────────────────────
+                has_adv = any(v != '-' for v in adv.values())
+                if has_adv:
+                    adv_html = (
+                        f'<span class="stat-badge-adv stat-badge-war">WAR <b>{adv["WAR"]}</b></span>'
+                        f'<span class="stat-badge-adv stat-badge-fip">FIP <b>{adv["FIP"]}</b></span>'
+                        f'<span class="stat-badge-adv stat-badge-k9">K% <b>{adv["K%"]}%</b></span>'
+                        f'<span class="stat-badge-adv stat-badge-bb9">BB% <b>{adv["BB%"]}%</b></span>'
+                    )
+                    st.markdown(
+                        f'<div style="margin:8px 0 2px 0;">{basic_html}</div>'
+                        f'<div style="margin:2px 0 6px 0;">{adv_html}'
+                        f'<span style="font-size:0.68rem;color:#a0aec0;margin-left:4px;">'
+                        f'WAR·K%·BB% via Naver / FIP via Statiz</span>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        f'<div style="margin:8px 0 2px 0;">{basic_html}</div>',
+                        unsafe_allow_html=True
+                    )
 
         st.divider()
         if 'show_pitcher' in locals() and show_pitcher and show_pitcher != '-':
