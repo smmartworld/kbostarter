@@ -642,10 +642,14 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 final_pitcher = predicted
                 pitcher_source = "자동 예측"
 
-            # 🔥 현재 세션에 선택된 투수가 없거나, 우선순위가 바뀌면 자동 갱신
-            current_pitcher = st.session_state.get(pitcher_key)
-            if current_pitcher != final_pitcher:
+            # ── 수정 후 ─────────────────────────────────────────
+            final_key = f"{pitcher_key}_last_final"
+            prev_final = st.session_state.get(final_key)
+
+            # final_pitcher 자체가 바뀐 경우(날짜 이동, 오피셜 변경 등)만 자동 초기화
+            if prev_final != final_pitcher or st.session_state.get(pitcher_key) is None:
                 st.session_state[pitcher_key] = final_pitcher
+                st.session_state[final_key] = final_pitcher
 
             show_pitcher = st.session_state[pitcher_key]
 
