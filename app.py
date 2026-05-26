@@ -346,7 +346,7 @@ with nav3:
         st.session_state.cal_month = 1 if month == 12 else month + 1
         st.rerun()
 
-day_names = ['월', '화', '수', '목', '금', '토', '일']
+day_names = ['일', '월', '화', '수', '목', '금', '토']
 hcols = st.columns(7)
 for i, d in enumerate(day_names): hcols[i].markdown(f'<div class="cal-day-name">{d}</div>', unsafe_allow_html=True)
 
@@ -354,7 +354,8 @@ my_all_games = working_df[((working_df['팀'] == st.session_state.my_team) | (wo
 my_all_games = my_all_games.sort_values('날짜')
 
 sel_date = st.session_state.selected_date
-for week in cal_module.monthcalendar(year, month):
+cal_obj = cal_module.Calendar(firstweekday=6)
+for week in cal_obj.monthdayscalendar(year, month):
     row_cols = st.columns(7)
     for i, day in enumerate(week):
         with row_cols[i]:
