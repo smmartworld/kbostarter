@@ -9,7 +9,7 @@ TEAM_COLORS = {
 # 🔥 [NEW] 제외된 투수는 로테이션 후보군에서 아예 삭제!
 def get_active_rotation(df, team, target_date, excluded_pitchers=None):
     if excluded_pitchers is None: excluded_pitchers = []
-    past_games = df[(df['팀'] == team) & (df['상태'].isin(['종료', '수동확정'])) & (df['날짜'] < pd.to_datetime(target_date))]
+    past_games = df[(df['팀'] == team) & (df['상태'].isin(['종료', '수동확정', '노게임'])) & (df['날짜'] < pd.to_datetime(target_date))]
     if past_games.empty: return []
     recent_starters = past_games.sort_values('날짜', ascending=False).head(15)['선발투수'].dropna().unique()
     return [p for p in recent_starters if p != '-' and p not in excluded_pitchers][:6]
@@ -34,7 +34,7 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     # 🔥 실제로 던진 경기만 로테이션 소비로 인정
     known_games = df[
         (df['팀'] == team) &
-        (df['상태'] == '종료') &
+        (df['상태'].isin(['종료', '노게임'])) &
         (df['선발투수'].notna()) &
         (df['선발투수'] != '-') &
         (df['날짜'] < target_dt)
@@ -153,7 +153,7 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     return predicted_pitcher, rot_df[['선발투수', '휴식일']], is_official
 
 def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
-    pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'] == '종료') & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
+    pitcher_df = df[(df['선발투수'] == pitcher_name) & (df['상태'].isin(['종료', '노게임'])) & (df['날짜'] < pd.to_datetime(target_date))].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
     pitcher_df['휴식일'] = (pitcher_df['날짜'].diff().dt.days - 1).fillna(0).astype(int)
@@ -229,7 +229,7 @@ def get_season_stats(df, pitcher_name, target_date):
 def get_recent_rotation_list(df, team, target_date, n=10):
     team_df = df[
         (df['팀'] == team) &
-        (df['상태'] == '종료') &
+        (df['상태'].isin(['종료', '노게임'])) &
         (df['선발투수'] != '-') &
         (df['날짜'] < pd.to_datetime(target_date))
     ].copy().sort_values('날짜', ascending=False)
@@ -242,7 +242,7 @@ def get_recent_rotation_list(df, team, target_date, n=10):
     for _, row in recent.iterrows():
         p_name = row['선발투수']
         p_date = row['날짜']
-        prev_games = df[(df['선발투수'] == p_name) & (df['상태'] == '종료') & (df['날짜'] < p_date)].sort_values('날짜')
+        prev_games = df[(df['선발투수'] == p_name) & (df['상태'].isin(['종료', '노게임'])) & (df['날짜'] < p_date)].sort_values('날짜')
         if not prev_games.empty:
             rest_days = max(0, (p_date - prev_games.iloc[-1]['날짜']).days - 1)
             rest_days_list.append(rest_days)

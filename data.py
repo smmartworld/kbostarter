@@ -123,6 +123,8 @@ def master_collector_v21():
                             # 🔥 [핵심 로직] 네이버 API 상태값을 최우선으로 믿기!
                             if game_status == 'CANCEL':
                                 status = '우천취소'
+                            elif game_status == 'NOGAME':
+                                status = '노게임'
                             elif game_status == 'RESULT':
                                 status = '종료'
                             else:
@@ -139,6 +141,40 @@ def master_collector_v21():
                                 new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', '-', '-', '-', '-', '-', '-'])
                                 new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', '-', '-', '-', '-', '-', '-'])
                                 print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
+                                is_saved = True
+
+                            elif status == '노게임':
+                                a_name = game_info.get('awayStarterName', '-')
+                                h_name = game_info.get('homeStarterName', '-')
+                                a_inn, a_np, a_hit, a_sasa, a_er = '0', '0', '0', '0', '0'
+                                h_inn, h_np, h_hit, h_sasa, h_er = '0', '0', '0', '0', '0'
+                                
+                                record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
+                                try:
+                                    rec_res = requests.get(record_url, headers=headers, timeout=5)
+                                    if rec_res.status_code == 200:
+                                        rec_data = rec_res.json()
+                                        recordData = rec_data.get('result', {}).get('recordData') or {}
+                                        if 'pitchersBoxscore' in recordData:
+                                            pitchers = recordData['pitchersBoxscore']
+                                            if pitchers.get('away') and len(pitchers['away']) > 0:
+                                                a = pitchers['away'][0]
+                                                a_name = a.get('name', a_name)
+                                                a_inn, a_np, a_hit = a.get('inn', '0'), a.get('bf', '0'), a.get('hit', '0')
+                                                a_sasa = str(int(a.get('bb', 0)) + int(a.get('hp', 0)))
+                                                a_er = a.get('er', '0')
+                                            if pitchers.get('home') and len(pitchers['home']) > 0:
+                                                h = pitchers['home'][0]
+                                                h_name = h.get('name', h_name)
+                                                h_inn, h_np, h_hit = h.get('inn', '0'), h.get('bf', '0'), h.get('hit', '0')
+                                                h_sasa = str(int(h.get('bb', 0)) + int(h.get('hp', 0)))
+                                                h_er = h.get('er', '0')
+                                except Exception:
+                                    pass
+
+                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
+                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
+                                print(f"   💦 {current_date_str} | {away_team}({a_name} {a_np}구) vs {home_team}({h_name} {h_np}구) [저장: 노게임]")
                                 is_saved = True
 
                             elif status == '종료':
