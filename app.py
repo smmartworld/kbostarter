@@ -599,9 +599,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             # 4. 시즌 스탯 (원래 컬러 그대로 사용)
             row2_html = (
-                f'<div class="border-badge border-gray"><div class="bb-label">선발(시즌)</div><div class="bb-value">{s.get("등판", "-")}회</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">선발</div><div class="bb-value">{s.get("등판", "-")}회</div></div>'
                 f'<div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s.get("ERA", "-")}</div></div>'
-                f'<div class="border-badge border-gray"><div class="bb-label">이닝(시즌)</div><div class="bb-value">{s.get("총이닝", "-")}</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">이닝</div><div class="bb-value">{s.get("총이닝", "-")}</div></div>'
                 f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
             )
             
