@@ -99,7 +99,7 @@ STADIUMS = {
 
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = st.secrets["auth"]["sheet_url"] [cite: 1]
+SHEET_URL = st.secrets["auth"]["sheet_url"]
 
 @st.cache_data(ttl=1800)
 def load_data():
