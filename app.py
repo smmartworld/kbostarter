@@ -99,7 +99,7 @@ STADIUMS = {
 
 from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
-SHEET_URL = "https://docs.google.com/spreadsheets/d/183uhIBmpzZ76B4S-4Y-_1B54cF6NThycuGYDKtQUhx8/edit?usp=sharing"
+SHEET_URL = st.secrets["auth"]["sheet_url"] [cite: 1]
 
 @st.cache_data(ttl=1800)
 def load_data():
@@ -208,7 +208,7 @@ if show_admin:
             pw = st.text_input("비밀번호", type="password", placeholder="비밀번호를 입력하세요", label_visibility="collapsed")
         with pw_c2:
             if st.button("해제", use_container_width=True):
-                if pw == "password12":
+                if pw == st.secrets["auth"]["admin_password"]:
                     st.session_state.admin_unlocked = True
                     st.rerun()
                 else:
