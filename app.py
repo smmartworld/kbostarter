@@ -343,7 +343,10 @@ with nav3:
         st.session_state.cal_month = 1 if month == 12 else month + 1
         st.rerun()
 
-day_names = ['월', '화', '수', '목', '금', '토', '일']
+# 💡 여기를 수정: 달력 시작 요일을 일요일(SUNDAY)로 설정하고 요일 순서 변경
+cal_module.setfirstweekday(cal_module.SUNDAY)
+day_names = ['일', '월', '화', '수', '목', '금', '토']
+
 hcols = st.columns(7)
 for i, d in enumerate(day_names): hcols[i].markdown(f'<div class="cal-day-name">{d}</div>', unsafe_allow_html=True)
 
