@@ -492,7 +492,8 @@ with nav_col2:
     if status == '종료':
         st.markdown(f'<div class="score-banner">{away_team} &nbsp; {g["away_score"]} : {g["home_score"]} &nbsp; {home_team}</div>', unsafe_allow_html=True)
     elif status == '우천취소':
-        st.error(f"☔ {away_team} vs {home_team} — 우천취소된 경기입니다."); st.stop()
+        # st.stop()을 제거해서 아래쪽 팀 패널과 투수 정보가 정상적으로 나오게 함!
+        st.markdown(f'<div class="score-banner" style="background: #edf2f7; border-color: #cbd5e0; color: #4a5568; font-size: 0.95rem;">☔ {away_team} vs {home_team} — 우천취소된 경기</div>', unsafe_allow_html=True)
     # 🔥 [NEW] 노게임 배너
     elif status == '노게임':
         st.markdown(f'<div class="score-banner nogame">🚫 {away_team} vs {home_team} — 노게임 (기록 무효)</div>', unsafe_allow_html=True)
