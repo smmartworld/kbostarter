@@ -553,11 +553,80 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             r = actual_row.iloc[0]
             show_pitcher = r["선발투수"]
             
-            st.markdown(f'<div class="sec-label">실제 선발 투수</div><div style="font-size:1.4rem;font-weight:900;">{show_pitcher}</div>', unsafe_allow_html=True)
-            st.markdown(f'<span class="stat-badge">당일 이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">당일 자책 <b>{r["자책점"]}</b></span><span class="stat-badge">당일 투구 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
+            # 1. 상태 바(Scoreboard) 통일
+            team_color = TEAM_COLORS.get(team, "#4a5568")
+            scoreboard_html = f"""
+            <div style="
+                background: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-left: 6px solid {team_color};
+                border-radius: 8px;
+                padding: 0 16px;
+                margin-bottom: 12px;
+                height: 48px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+                font-family: 'Malgun Gothic', sans-serif;
+            ">
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    width:100%;
+                    height:100%;
+                    overflow-x:auto;
+                    white-space:nowrap;
+                    scrollbar-width:none;
+                    -ms-overflow-style:none;
+                ">
+                    <div style="font-weight:800; font-size:0.95rem; color:#2d3748; flex-shrink:0;">
+                        🏁 등판 완료 | 실제 선발: {show_pitcher}
+                    </div>
+                </div>
+            </div>
+            """
+            components.html(scoreboard_html, height=60)
             
+            # 2. 당일 기록 및 시즌 기록 데이터 불러오기
             s = get_season_stats(working_df, show_pitcher, selected_dt)
-            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+            adv = get_advanced_stats(show_pitcher)
+            whip_val = s["WHIP"] if 'WHIP' in s else "-"
+            
+            # 3. 당일 스탯 (요청한 대로 모두 회색 border-gray 통일)
+            row1_html = (
+                f'<div class="border-badge border-gray"><div class="bb-label">당일 이닝</div><div class="bb-value">{r.get("이닝", "-")}</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">당일 자책</div><div class="bb-value">{r.get("자책점", "-")}</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">당일 투구</div><div class="bb-value">{r.get("투구수", "-")}</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">당일 피안타</div><div class="bb-value">{r.get("피안타", "-")}</div></div>'
+            )
+
+            # 4. 시즌 스탯 (원래 컬러 그대로 사용)
+            row2_html = (
+                f'<div class="border-badge border-gray"><div class="bb-label">선발(시즌)</div><div class="bb-value">{s.get("등판", "-")}회</div></div>'
+                f'<div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s.get("ERA", "-")}</div></div>'
+                f'<div class="border-badge border-gray"><div class="bb-label">이닝(시즌)</div><div class="bb-value">{s.get("총이닝", "-")}</div></div>'
+                f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
+            )
+            
+            # 5. 심화 스탯(WAR 등)이 있으면 3번째 줄까지 렌더링
+            has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
+            if has_adv:
+                k_val = f'{adv["K%"]}%' if adv["K%"] != '-' else '-'
+                bb_val = f'{adv["BB%"]}%' if adv["BB%"] != '-' else '-'
+                
+                row3_html = (
+                    f'<div class="border-badge border-green"><div class="bb-label">WAR</div><div class="bb-value">{adv["WAR"]}</div></div>'
+                    f'<div class="border-badge border-red"><div class="bb-label">FIP</div><div class="bb-value">{adv["FIP"]}</div></div>'
+                    f'<div class="border-badge border-blue"><div class="bb-label">K%</div><div class="bb-value">{k_val}</div></div>'
+                    f'<div class="border-badge border-blue"><div class="bb-label">BB%</div><div class="bb-value">{bb_val}</div></div>'
+                )
+                st.markdown(
+                    f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}{row3_html}</div>', 
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>', 
+                    unsafe_allow_html=True
+                )
 
         # 🔥 [NEW] 노게임 팀 패널
         elif status == '노게임':
