@@ -12,7 +12,6 @@ def master_collector_v21():
         'NC': 'NC', '두산': 'OB', '키움': 'WO', '삼성': 'SS', '한화': 'HH'
     }
 
-    # 🔥 UTC deprecation 경고 해결!
     now_kst = datetime.now(timezone.utc) + timedelta(hours=9)
     today_obj = now_kst.date()
     start_date = today_obj - timedelta(days=7)
@@ -25,7 +24,6 @@ def master_collector_v21():
 
     new_data = []
     
-    # 🔥 1단계 방어막: 우리가 어제 저장해 둔 마스터데이터의 선발투수 기억해두기!
     file_name = '로테이션_마스터데이터.csv'
     saved_starters = {}
     if os.path.exists(file_name):
@@ -42,7 +40,6 @@ def master_collector_v21():
         kbo_url = "https://www.koreabaseball.com/ws/Schedule.asmx/GetScheduleList"
         payload = {'leId': '1', 'srIdList': '0,9', 'seasonId': '2026', 'gameMonth': month, 'teamId': ''}
         
-        # 🔥 [NEW] KBO 서버가 XML/HTML 대신 예쁜 JSON을 주도록 AJAX 헤더 완벽 세팅!
         kbo_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'X-Requested-With': 'XMLHttpRequest',
@@ -57,10 +54,9 @@ def master_collector_v21():
                 continue
             kbo_data = kbo_res.json()
         except Exception as e:
-            # 🔥 에러가 나면 조용히 무시하지 않고 출력!
             print(f"   ⚠️ KBO 크롤링 중 에러 발생: {e}")
             if 'kbo_res' in locals():
-                print(f"   📄 서버가 준 정체불명 데이터: {kbo_res.text[:100]}") # 범인 몽타주 확인용
+                print(f"   📄 서버가 준 정체불명 데이터: {kbo_res.text[:100]}")
             continue
         
         rows = kbo_data.get('rows', [])
@@ -119,16 +115,16 @@ def master_collector_v21():
                             base_data = base_res.json()
                             game_info = base_data.get('result', {}).get('game', {})
                             game_status = game_info.get('statusCode', '')
+                            # 🔥 [NEW] cancel 플래그 확인 (던지다 취소된 노게임 감지용)
+                            is_cancelled = game_info.get('cancel', False)
 
                             # 🔥 [핵심 로직] 네이버 API 상태값을 최우선으로 믿기!
-                            if game_status == 'CANCEL':
-                                status = '우천취소'
-                            elif game_status == 'NOGAME':
-                                status = '노게임'
-                            elif game_status == 'RESULT':
+                            if game_status == 'RESULT':
                                 status = '종료'
+                            elif game_status == 'CANCEL' or is_cancelled:
+                                status = '우천취소'  # 노게임 여부는 아래에서 추가 확인
                             else:
-                                status = '예정' # 🔥 1.2이닝 방어! (RESULT 빼고 PLAYING, STARTED 등 무조건 예정 처리)
+                                status = '예정'  # 🔥 1.2이닝 방어! (RESULT 빼고 PLAYING, STARTED 등 무조건 예정 처리)
 
                             if status == '예정' and game_date_obj < today_obj:
                                 status = '우천취소'
@@ -137,45 +133,48 @@ def master_collector_v21():
                             a_inn, a_np, a_hit, a_sasa, a_er = '-', '-', '-', '-', '-'
                             h_inn, h_np, h_hit, h_sasa, h_er = '-', '-', '-', '-', '-'
 
-                            if status == '우천취소':
-                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', '-', '-', '-', '-', '-', '-'])
-                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', '-', '-', '-', '-', '-', '-'])
-                                print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
-                                is_saved = True
+                            # 🔥 [NEW] get_stats 헬퍼를 공통으로 쓰기 위해 바깥으로 추출
+                            def get_stats(p):
+                                name = p.get('name', '')
+                                inn = p.get('inn', '0')
+                                np_val = p.get('bf', '0') 
+                                hit = p.get('hit', '0')
+                                sasa = str(int(p.get('bb', 0)) + int(p.get('hp', 0))) 
+                                er = p.get('er', '0')
+                                return name, inn, np_val, hit, sasa, er
 
-                            elif status == '노게임':
-                                a_name = game_info.get('awayStarterName', '-')
-                                h_name = game_info.get('homeStarterName', '-')
-                                a_inn, a_np, a_hit, a_sasa, a_er = '0', '0', '0', '0', '0'
-                                h_inn, h_np, h_hit, h_sasa, h_er = '0', '0', '0', '0', '0'
-                                
-                                record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
+                            if status == '우천취소':
+                                # 🔥 [NEW] 던지다 취소된 노게임인지 확인!
+                                # cancel=True여도 pitchersBoxscore에 이닝 데이터가 있으면 노게임
                                 try:
+                                    record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
                                     rec_res = requests.get(record_url, headers=headers, timeout=5)
                                     if rec_res.status_code == 200:
                                         rec_data = rec_res.json()
                                         recordData = rec_data.get('result', {}).get('recordData') or {}
                                         if 'pitchersBoxscore' in recordData:
                                             pitchers = recordData['pitchersBoxscore']
-                                            if pitchers.get('away') and len(pitchers['away']) > 0:
-                                                a = pitchers['away'][0]
-                                                a_name = a.get('name', a_name)
-                                                a_inn, a_np, a_hit = a.get('inn', '0'), a.get('bf', '0'), a.get('hit', '0')
-                                                a_sasa = str(int(a.get('bb', 0)) + int(a.get('hp', 0)))
-                                                a_er = a.get('er', '0')
-                                            if pitchers.get('home') and len(pitchers['home']) > 0:
-                                                h = pitchers['home'][0]
-                                                h_name = h.get('name', h_name)
-                                                h_inn, h_np, h_hit = h.get('inn', '0'), h.get('bf', '0'), h.get('hit', '0')
-                                                h_sasa = str(int(h.get('bb', 0)) + int(h.get('hp', 0)))
-                                                h_er = h.get('er', '0')
-                                except Exception:
+                                            away_list = pitchers.get('away', [])
+                                            home_list = pitchers.get('home', [])
+                                            if away_list and home_list:
+                                                a_inn_check = str(away_list[0].get('inn', '0')).strip()
+                                                # 이닝이 '0' '0.0' '-' 이 아니면 실제로 던진 것 → 노게임!
+                                                if a_inn_check and a_inn_check not in ('0', '0.0', '-', ''):
+                                                    status = '노게임'
+                                                    a_name, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(away_list[0])
+                                                    h_name, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(home_list[0])
+                                                    new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
+                                                    new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
+                                                    print(f"   🚫 {current_date_str} | {away_team}({a_name}) vs {home_team}({h_name}) [저장: 노게임]")
+                                                    is_saved = True
+                                except Exception as e:
                                     pass
 
-                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
-                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
-                                print(f"   💦 {current_date_str} | {away_team}({a_name} {a_np}구) vs {home_team}({h_name} {h_np}구) [저장: 노게임]")
-                                is_saved = True
+                                if not is_saved:
+                                    new_data.append([current_date_str, away_team, home_team, '원정', '우천취소', '-', '-', '-', '-', '-', '-', '-', '-'])
+                                    new_data.append([current_date_str, home_team, away_team, '홈', '우천취소', '-', '-', '-', '-', '-', '-', '-', '-'])
+                                    print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
+                                    is_saved = True
 
                             elif status == '종료':
                                 record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
@@ -186,15 +185,6 @@ def master_collector_v21():
                                     if 'pitchersBoxscore' in recordData:
                                         pitchers = recordData['pitchersBoxscore']
                                         if pitchers.get('away') and pitchers.get('home') and len(pitchers['away']) > 0 and len(pitchers['home']) > 0:
-                                            def get_stats(p):
-                                                name = p.get('name', '')
-                                                inn = p.get('inn', '0')
-                                                np = p.get('bf', '0') 
-                                                hit = p.get('hit', '0')
-                                                sasa = str(int(p.get('bb', 0)) + int(p.get('hp', 0))) 
-                                                er = p.get('er', '0')
-                                                return name, inn, np, hit, sasa, er
-
                                             a_name, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(pitchers['away'][0])
                                             h_name, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(pitchers['home'][0])
                                             
@@ -210,13 +200,11 @@ def master_collector_v21():
                                 a_name = game_info.get('awayStarterName', '-')
                                 h_name = game_info.get('homeStarterName', '-')
                                 
-                                # 1단계 방어막: 마스터데이터(어제 기록)에서 먼저 찾아보기
                                 if not a_name or a_name == '-':
                                     a_name = saved_starters.get((current_date_str, away_team), '-')
                                 if not h_name or h_name == '-':
                                     h_name = saved_starters.get((current_date_str, home_team), '-')
 
-                                # 2단계 방어막: 그래도 빈칸(-)이면, 네이버 라이브 박스스코어에서 직접 뜯어오기! (오류 났던 부분 수정 완료!)
                                 if game_status not in ['BEFORE', 'CANCEL'] and (a_name == '-' or h_name == '-'):
                                     try:
                                         record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
@@ -237,7 +225,6 @@ def master_collector_v21():
                                 if not h_name: h_name = '-'
 
                                 if a_name != '-' and h_name != '-':
-                                    # 진행 중이더라도 점수 표시 안 하고 '예정' 상태로 저장!
                                     new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
                                     new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
                                     
@@ -261,7 +248,6 @@ def master_collector_v21():
 
     print("\n💾 데이터 병합(Upsert) 작업 시작...")
     
-    # 🔥 [NEW] 치명적 버그 수정: 크롤링 에러로 가져온 새 데이터가 하나도 없으면 기존 데이터 보호!
     if len(new_data) == 0:
         print("   🚨 크롤링된 새 데이터가 없습니다! 기존 마스터데이터 삭제를 막기 위해 병합을 취소합니다.")
         return

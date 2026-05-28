@@ -26,7 +26,6 @@ st.markdown("""
     @media (max-width: 768px) {
         .block-container { padding-left: 0.2rem; padding-right: 0.2rem; }
         .cal-wrap { overflow-x: auto; padding: 10px; }
-        /* 달력 너비와 버튼 크기를 모바일에 맞게 축소 */
         .cal-wrap [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 100% !important; }
         .cal-wrap div[data-testid="column"] { min-width: 45px !important; width: 14% !important; flex: 1 1 auto !important; }
         div[data-testid="stButton"] button { padding: 0.1rem 0 !important; font-size: 0.7rem; min-height: 40px !important; }
@@ -43,6 +42,7 @@ st.markdown("""
     .mc-done { font-size: 0.78rem; color: #276749; font-weight: 600; }
     .mc-plan { font-size: 0.78rem; color: #c05621; font-weight: 600; }
     .mc-cancel { font-size: 0.78rem; color: #9b2c2c; }
+    .mc-nogame { font-size: 0.78rem; color: #744210; font-weight: 700; }
     .mc-manual { font-size: 0.78rem; color: #3182ce; font-weight: 800; }
     
     .mc-logo-wrap { display: inline-flex; justify-content: center; align-items: center; width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background-color: white; }
@@ -54,30 +54,30 @@ st.markdown("""
     .sec-label { font-size: 0.72rem; font-weight: 800; color: #a0aec0; margin: 12px 0 5px 0; }
     .score-banner { background: #f0fff4; border: 1px solid #9ae6b4; border-radius: 10px; padding: 10px 20px; text-align: center; font-size: 1.35rem; font-weight: 800; color: #276749; margin: 8px 0 16px 0; }
     .score-banner.upcoming { background: #fffaf0; border-color: #fbd38d; color: #c05621; font-size: 0.95rem; }
+    .score-banner.nogame { background: #fffbeb; border-color: #f6e05e; color: #744210; font-size: 0.95rem; }
     
     .stat-badge { display: inline-block; background: #edf2f7; border-radius: 6px; padding: 3px 10px; font-size: 0.78rem; color: #4a5568; margin: 2px 3px 2px 0; white-space: nowrap; }
     
-    /* 🔥 새로 추가된 투수 스탯 그리드 & 보더 뱃지 스타일 */
     .pitcher-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; box-sizing: border-box; }
     
     .border-badge {
         display: flex; 
-        flex-direction: row; /* 🔥 가로 배치로 변경! */
+        flex-direction: row;
         gap: 12px;
-        align-items: center; /* 수직 중앙 정렬 */
+        align-items: center;
         background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;
-        padding: 6px 12px; /* 좌우 여백을 넓혀서 시원하게 */
-        min-height: 38px; /* 한 줄에 맞게 적절한 높이 */
+        padding: 6px 12px;
+        min-height: 38px;
         box-sizing: border-box;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
     .border-badge .bb-label { font-size: 0.75rem; font-weight: 700; color: #718096; margin: 0; line-height: 1; }
     .border-badge .bb-value { font-size: 0.95rem; font-weight: 800; color: #1a202c; margin: 0; line-height: 1; }
 
-    .border-gray   { border-left: 4px solid #cbd5e0; } /* 기본 정보 (회색) */
-    .border-red    { border-left: 4px solid #f56565; } /* 실점 관련 (옅은 적색) */
-    .border-blue   { border-left: 4px solid #4299e1; } /* 제구 관련 (옅은 청색) */
-    .border-green  { border-left: 4px solid #48bb78; } /* 종합 체급 (옅은 초록색) */
+    .border-gray   { border-left: 4px solid #cbd5e0; }
+    .border-red    { border-left: 4px solid #f56565; }
+    .border-blue   { border-left: 4px solid #4299e1; }
+    .border-green  { border-left: 4px solid #48bb78; }
 
     div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
     div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
@@ -86,6 +86,7 @@ st.markdown("""
     .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-local { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-drop { background: #edf2f7; border: 1px solid #e2e8f0; color: #718096; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
+    .nogame-badge { background: #fffbeb; border: 1px solid #f6e05e; color: #744210; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     
     .admin-panel { background: #fffaf0; border: 2px solid #fbd38d; border-radius: 12px; padding: 15px 20px; margin-bottom: 20px; }
 </style>
@@ -112,11 +113,8 @@ except FileNotFoundError:
     st.error("❌ 데이터 파일 없음. data.py 먼저 실행 필요.")
     st.stop()
 
-# ── 스탯티즈 심화 스탯 로드 (없어도 앱은 정상 동작) ──────────────────────────
 @st.cache_data(ttl=3600)
 def load_advanced_stats() -> pd.DataFrame:
-    """pitcher_advanced_stats.csv 로드. 없으면 빈 DataFrame 반환."""
-    # 구버전 statiz_stats.csv도 fallback으로 읽음 (마이그레이션 대응)
     for fname in ['pitcher_advanced_stats.csv', 'statiz_stats.csv']:
         if not os.path.exists(fname):
             continue
@@ -133,7 +131,6 @@ def load_advanced_stats() -> pd.DataFrame:
 adv_stats_df = load_advanced_stats()
 
 def get_advanced_stats(pitcher_name: str) -> dict:
-    """투수 심화 스탯 조회. 없으면 '-' 반환."""
     empty = {'WAR': '-', 'FIP': '-', 'K%': '-', 'BB%': '-'}
     if adv_stats_df.empty:
         return empty
@@ -166,7 +163,7 @@ db_df = load_manager_data()
 db_overrides = {}
 db_absences = {}
 db_excluded = set()
-db_cancels = set() # 🔥 [NEW] DB 우취 명단
+db_cancels = set()
 
 for _, row in db_df.iterrows():
     if pd.isna(row.get('팀')) or pd.isna(row.get('선수')): continue
@@ -181,7 +178,7 @@ for _, row in db_df.iterrows():
         db_absences[(t, p)] = pd.to_datetime(d_str).date()
     elif m_type == "로테이션 제외":
         db_excluded.add((t, p))
-    elif m_type == "우천취소": # 🔥 [NEW] 우취 파싱
+    elif m_type == "우천취소":
         db_cancels.add((t, d_str))
 
 _defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'cancels': set(), 'admin_unlocked': False}
@@ -222,7 +219,7 @@ if show_admin:
                 st.session_state.admin_unlocked = False
                 st.rerun()
                 
-        c1, c2, c3 = st.columns([2, 2, 4]) # 🔥 라디오 버튼이 길어져서 비율 조정!
+        c1, c2, c3 = st.columns([2, 2, 4])
         with c1:
             m_team = st.selectbox("구단", list(TEAM_COLORS.keys()), key="adm_t")
         with c2:
@@ -231,9 +228,7 @@ if show_admin:
             m_player = st.selectbox("선수", active_p, key="adm_p")
             custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
             final_player = custom_player if custom_player else m_player
-        # 수정 후
         with c3:
-            # 🔥 우천취소 옵션 추가!
             m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외", "우천취소"], key="adm_type", horizontal=True)
             
         c4, c5 = st.columns([3, 1])
@@ -242,10 +237,10 @@ if show_admin:
                 m_date = st.date_input("선발 등판 확정일", value=date.today())
             elif m_type == "휴식/말소":
                 m_date = st.date_input("복귀 예정일 (이 날부터 등판 가능)", value=date.today() + timedelta(days=10))
-            elif m_type == "우천취소": # 🔥 [NEW] 우취 UI
+            elif m_type == "우천취소":
                 st.info("☔ 해당 날짜의 경기를 우천취소 처리하여 로테이션을 하루 밉니다.")
                 m_date = st.date_input("우천취소 날짜", value=date.today())
-                final_player = "팀전체" # 선수가 특정되지 않으므로 팀전체로 넣음
+                final_player = "팀전체"
             else:
                 st.info("🚫 해당 투수를 선발 로테이션 계산에서 즉시 제외합니다.")
                 m_date = date.today()
@@ -269,7 +264,6 @@ if show_admin:
             st.markdown("**📋 현재 DB 등록 현황**")
             for i, row in db_df.iterrows():
                 t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
-                # 🔥 [NEW] 뱃지 아이콘 분기
                 icon = "🎯" if typ == "선발 지정" else ("⏸️" if typ == "휴식/말소" else "🚫")
                 dc1, dc2 = st.columns([4, 1])
                 with dc1:
@@ -287,40 +281,29 @@ if show_admin:
 
 working_df = original_df.copy()
 
-# 🔥 [NEW] 우취 명단 자동 확장 로직
-# db_cancels와 session_state.cancels를 합친 뒤, 상대팀도 찾아서 같이 넣어줌!
 all_cancels = set(db_cancels) | st.session_state.cancels
 expanded_cancels = set()
 
 for t, d_str in all_cancels:
     expanded_cancels.add((t, d_str))
-    # 해당 날짜, 해당 팀의 데이터 찾아서 상대팀 알아내기
     mask = (working_df['팀'] == t) & (working_df['날짜'] == pd.to_datetime(d_str))
     if not working_df[mask].empty:
         opp = working_df[mask].iloc[0]['상대팀']
         expanded_cancels.add((opp, d_str))
 
-# 🔥 [NEW] 1단계: 구글 시트 DB 강제 지정 적용 (오피셜이 없을 때만 백엔드 데이터에 반영!)
 for (team, dt_str), pitcher in db_overrides.items():
     dt_pd = pd.to_datetime(dt_str)
     mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
     if mask.any():
-
         current_status = working_df.loc[mask, '상태'].values[0]
-
-        # 🔥 종료 경기면 실제 데이터 우선
         if current_status == '종료':
             continue
         current_pitcher = working_df.loc[mask, '선발투수'].values[0]
-        
-        # 이미 현실 KBO 오피셜 선발투수가 나온 상태('예정'이면서 투수가 있는 경우)라면 DB 지정을 패스!
         if current_status == '예정' and pd.notna(current_pitcher) and current_pitcher != '-':
             continue
-            
         working_df.loc[mask, '선발투수'] = pitcher
         working_df.loc[mask, '상태'] = '수동확정' 
 
-# 🔥 [NEW] 2단계: 로컬 샌드박스 수동 지정 적용 (유저의 What-if 테스트를 위해 백엔드 데이터에 반영!)
 for (team, dt_str), pitcher in st.session_state.overrides.items():
     dt_pd = pd.to_datetime(dt_str)
     mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
@@ -346,7 +329,7 @@ with nav3:
         st.session_state.cal_month = 1 if month == 12 else month + 1
         st.rerun()
 
-day_names = ['일', '월', '화', '수', '목', '금', '토']
+day_names = ['월', '화', '수', '목', '금', '토', '일']
 hcols = st.columns(7)
 for i, d in enumerate(day_names): hcols[i].markdown(f'<div class="cal-day-name">{d}</div>', unsafe_allow_html=True)
 
@@ -354,8 +337,7 @@ my_all_games = working_df[((working_df['팀'] == st.session_state.my_team) | (wo
 my_all_games = my_all_games.sort_values('날짜')
 
 sel_date = st.session_state.selected_date
-cal_obj = cal_module.Calendar(firstweekday=6)
-for week in cal_obj.monthdayscalendar(year, month):
+for week in cal_module.monthcalendar(year, month):
     row_cols = st.columns(7)
     for i, day in enumerate(week):
         with row_cols[i]:
@@ -384,6 +366,9 @@ for week in cal_obj.monthdayscalendar(year, month):
                         except: btn_label = f"{day} ✅"
                     elif g_status == '우천취소': 
                         btn_label = f"{day} ⚪"
+                    # 🔥 [NEW] 노게임 달력 표시
+                    elif g_status == '노게임':
+                        btn_label = f"{day} 🚫"
                     elif str(r['선발투수']) != '-':
                         btn_label = f"{day} ✅"
                     
@@ -431,6 +416,8 @@ if not matchups.empty:
             
             if row['상태'] == '종료': status_html = f'<div class="mc-done">✅ {row["원정점수"]}:{row["홈점수"]}</div>'
             elif row['상태'] == '우천취소': status_html = '<div class="mc-cancel">☔ 우천취소</div>'
+            # 🔥 [NEW] 노게임 매치카드
+            elif row['상태'] == '노게임': status_html = '<div class="mc-nogame">🚫 노게임</div>'
             elif row['상태'] == '수동확정': status_html = '<div class="mc-manual">🛠️ 수동확정</div>'
             else: status_html = '<div class="mc-plan">⏰ 예정</div>'
             
@@ -472,6 +459,7 @@ st.divider()
 prev_game_date = None
 next_game_date = None
 
+# 🔥 [NEW] 노게임도 실제 경기 날짜로 인정 (우천취소만 제외)
 my_team_real_games = my_all_games[my_all_games['상태'] != '우천취소']
 
 if not my_team_real_games.empty:
@@ -505,6 +493,9 @@ with nav_col2:
         st.markdown(f'<div class="score-banner">{away_team} &nbsp; {g["away_score"]} : {g["home_score"]} &nbsp; {home_team}</div>', unsafe_allow_html=True)
     elif status == '우천취소':
         st.error(f"☔ {away_team} vs {home_team} — 우천취소된 경기입니다."); st.stop()
+    # 🔥 [NEW] 노게임 배너
+    elif status == '노게임':
+        st.markdown(f'<div class="score-banner nogame">🚫 {away_team} vs {home_team} — 노게임 (기록 무효)</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="score-banner upcoming">⏰ {away_team} vs {home_team} — 선발 투수 프리뷰</div>', unsafe_allow_html=True)
 
@@ -552,6 +543,21 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             
             s = get_season_stats(working_df, show_pitcher, selected_dt)
             st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+
+        # 🔥 [NEW] 노게임 팀 패널
+        elif status == '노게임':
+            actual_row = working_df[(working_df['날짜'] == selected_dt) & (working_df['팀'] == team) & (working_df['상태'] == '노게임')]
+            if actual_row.empty: st.warning("선발 기록 없음"); return
+            r = actual_row.iloc[0]
+            show_pitcher = r["선발투수"]
+
+            st.markdown('<span class="nogame-badge">🚫 노게임 — 공식 기록 무효</span>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sec-label">선발 투수 (비공식)</div><div style="font-size:1.4rem;font-weight:900;">{show_pitcher}</div>', unsafe_allow_html=True)
+            st.markdown(f'<span class="stat-badge">투구 이닝 <b>{r["이닝"]}</b></span><span class="stat-badge">투구수 <b>{r["투구수"]}</b></span>', unsafe_allow_html=True)
+
+            s = get_season_stats(working_df, show_pitcher, selected_dt)
+            st.markdown(f'<div style="margin:8px 0 2px 0;"><span class="stat-badge">시즌 등판 <b>{s["등판"]}회</b></span><span class="stat-badge">시즌 ERA <b>{s["ERA"]}</b></span></div>', unsafe_allow_html=True)
+
         else:
             dt_str = selected_dt.strftime('%Y-%m-%d')
             local_override_val = st.session_state.overrides.get((team, dt_str))
@@ -562,17 +568,14 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             with t_col2:
                 use_absence = st.toggle(f"⏸️ 휴식/말소", key=f"abs_tgl_{team}_{dt_str}")
             with t_col3:
-                # 🔥 expanded_cancels를 확인해서 상대팀이 우취됐어도 토글이 같이 켜지게 만듦!
                 is_cancelled = (team, dt_str) in expanded_cancels
                 use_cancel = st.toggle(f"☔ 우취 처리", value=is_cancelled, key=f"can_tgl_{team}_{dt_str}")
 
-            # 상태가 바뀌었을 때만 로직 실행 (무한 로딩 방지)
             if use_cancel != is_cancelled:
                 if use_cancel:
                     st.session_state.cancels.add((team, dt_str))
                 else:
                     st.session_state.cancels.discard((team, dt_str))
-                    # 우취 끌 때는 상대팀 우취 기록도 같이 꺼주기!
                     opp_team = home_team if is_away else away_team
                     st.session_state.cancels.discard((opp_team, dt_str))
                 st.rerun()
@@ -601,7 +604,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     st.rerun()
 
             if use_absence:
-                # 🔥 [NEW] 완전 제외자 명단 넘겨주기
                 team_db_excl = [p for t, p in db_excluded if t == team]
                 active_pitchers = get_active_rotation(working_df, team, selected_dt, excluded_pitchers=team_db_excl)
                 if active_pitchers:
@@ -643,11 +645,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 final_pitcher = predicted
                 pitcher_source = "자동 예측"
 
-            # ── 수정 후 ─────────────────────────────────────────
             final_key = f"{pitcher_key}_last_final"
             prev_final = st.session_state.get(final_key)
 
-            # final_pitcher 자체가 바뀐 경우(날짜 이동, 오피셜 변경 등)만 자동 초기화
             if prev_final != final_pitcher or st.session_state.get(pitcher_key) is None:
                 st.session_state[pitcher_key] = final_pitcher
                 st.session_state[final_key] = final_pitcher
@@ -656,59 +656,41 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             if show_pitcher and show_pitcher != "예측 불가" and show_pitcher != "-" and show_pitcher not in rotation_df['선발투수'].values:
                 p_games = working_df[(working_df['팀'] == team) & 
-                                     (working_df['상태'].isin(['종료', '수동확정'])) & 
+                                     (working_df['상태'].isin(['종료', '수동확정', '노게임'])) & 
                                      (working_df['선발투수'] == show_pitcher) & 
                                      (working_df['날짜'] < selected_dt)].sort_values('날짜')
                 rest_days = max(0, (selected_dt - p_games.iloc[-1]['날짜']).days - 1) if not p_games.empty else "?"
                 new_row = pd.DataFrame([{'선발투수': show_pitcher, '휴식일': rest_days}])
                 rotation_df = pd.concat([rotation_df, new_row], ignore_index=True)
-            # ----------------------------------------------------
-            # ⚾ 대시보드 상태 패널
-            # ----------------------------------------------------
 
             team_color = TEAM_COLORS.get(team, "#4a5568")
 
             if pitcher_source == "로컬 적용":
                 s_icon, s_text, s_color = "🧪", f"로컬: {show_pitcher}", "#2b6cb0"
-
             elif pitcher_source == "DB 공식":
                 s_icon, s_text, s_color = "📌", f"DB: {show_pitcher}", "#c05621"
-
             elif pitcher_source == "오피셜":
                 s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a"
-
             else:
                 s_icon, s_text, s_color = "🤖", f"자동 예측: {show_pitcher}", "#4a5568"
 
             info_badges = []
 
             if dt_str in combined_cancels:
-                info_badges.append(
-                    "<span style='color:#e53e3e; font-weight:700;'>☔ 우천취소</span>"
-                )
+                info_badges.append("<span style='color:#e53e3e; font-weight:700;'>☔ 우천취소</span>")
 
-            team_pitchers = working_df[
-                working_df['팀'] == team
-            ]['선발투수'].dropna().unique()
+            team_pitchers = working_df[working_df['팀'] == team]['선발투수'].dropna().unique()
 
             for p in team_pitchers:
-
                 if p in combined_absences:
                     ret_dt = pd.to_datetime(combined_absences[p]).date()
-
                     if selected_dt.date() < ret_dt:
-                        info_badges.append(
-                            f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>"
-                        )
-
+                        info_badges.append(f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>")
                 if p in team_db_excluded:
-                    info_badges.append(
-                        f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>"
-                    )
+                    info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
                 info_html = " <span style='color:#cbd5e0; margin: 0 10px;'>/</span> ".join(info_badges)
-
             else:
                 info_html = "<span style='color:#a0aec0;'>특이사항 없음</span>"
 
@@ -724,7 +706,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 box-shadow: 0 1px 3px rgba(0,0,0,0.04);
                 font-family: 'Malgun Gothic', sans-serif;
             ">
-
                 <div style="
                     display:flex;
                     align-items:center;
@@ -735,34 +716,13 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     scrollbar-width:none;
                     -ms-overflow-style:none;
                 ">
-
-                    <div style="
-                        font-weight:800;
-                        font-size:0.95rem;
-                        color:{s_color};
-                        flex-shrink:0;
-                    ">
+                    <div style="font-weight:800; font-size:0.95rem; color:{s_color}; flex-shrink:0;">
                         {s_icon} {s_text}
                     </div>
-
-                    <div style="
-                        width:2px;
-                        height:16px;
-                        background:#e2e8f0;
-                        flex-shrink:0;
-                        margin:0 16px;
-                    "></div>
-
-                    <div style="
-                        font-size:0.85rem;
-                        font-weight:600;
-                        flex-shrink:0;
-                        display:flex;
-                        align-items:center;
-                    ">
+                    <div style="width:2px; height:16px; background:#e2e8f0; flex-shrink:0; margin:0 16px;"></div>
+                    <div style="font-size:0.85rem; font-weight:600; flex-shrink:0; display:flex; align-items:center;">
                         {info_html}
                     </div>
-
                 </div>
             </div>
             """
@@ -775,13 +735,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 with btn_cols[j]:
                     is_active = (show_pitcher == pname)
                     
-                    # 🔥 [NEW] 선택된 날짜 기준으로 이 투수가 현재 휴식/말소 상태인지 판별!
                     is_absent = False
                     if pname in combined_absences and selected_dt.date() < combined_absences[pname]:
                         is_absent = True
                     
                     if is_absent:
-                        # 휴식 중이면 텍스트를 바꾸고, 아래 st.button에서 disabled 처리
                         return_date_str = combined_absences[pname].strftime('%m/%d')
                         btn_text = f"{pname}\n({return_date_str} 복귀)"
                     elif pname == predicted:
@@ -801,7 +759,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
                 whip_val = s["WHIP"] if 'WHIP' in s else "-"
                 
-                # ── 1행: 기본 스탯 (등판, ERA, 이닝, WHIP) ──────────────────────
                 row1_html = (
                     f'<div class="border-badge border-gray"><div class="bb-label">선발</div><div class="bb-value">{s["등판"]}회</div></div>'
                     f'<div class="border-badge border-red"><div class="bb-label">ERA</div><div class="bb-value">{s["ERA"]}</div></div>'
@@ -809,7 +766,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
                 )
 
-                # ── 2행: 심화 스탯 (WAR, FIP, K%, BB%) ─────────────────────────
                 has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
                 if has_adv:
                     k_val = f'{adv["K%"]}%' if adv["K%"] != '-' else '-'
