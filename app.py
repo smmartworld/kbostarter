@@ -585,12 +585,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             """
             components.html(scoreboard_html, height=60)
             
-            # 2. 당일 기록 및 시즌 기록 데이터 불러오기
+            # 2. 당일 기록 및 시즌 기본 기록만 불러오기
             s = get_season_stats(working_df, show_pitcher, selected_dt)
-            adv = get_advanced_stats(show_pitcher)
             whip_val = s["WHIP"] if 'WHIP' in s else "-"
             
-            # 3. 당일 스탯 (요청한 대로 모두 회색 border-gray 통일)
+            # 3. 당일 스탯 (모두 회색 border-gray 통일)
             row1_html = (
                 f'<div class="border-badge border-gray"><div class="bb-label">당일 이닝</div><div class="bb-value">{r.get("이닝", "-")}</div></div>'
                 f'<div class="border-badge border-gray"><div class="bb-label">당일 자책</div><div class="bb-value">{r.get("자책점", "-")}</div></div>'
@@ -606,27 +605,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 f'<div class="border-badge border-blue"><div class="bb-label">WHIP</div><div class="bb-value">{whip_val}</div></div>'
             )
             
-            # 5. 심화 스탯(WAR 등)이 있으면 3번째 줄까지 렌더링
-            has_adv = (adv['WAR'] != '-') or (adv['K%'] != '-' and adv['BB%'] != '-')
-            if has_adv:
-                k_val = f'{adv["K%"]}%' if adv["K%"] != '-' else '-'
-                bb_val = f'{adv["BB%"]}%' if adv["BB%"] != '-' else '-'
-                
-                row3_html = (
-                    f'<div class="border-badge border-green"><div class="bb-label">WAR</div><div class="bb-value">{adv["WAR"]}</div></div>'
-                    f'<div class="border-badge border-red"><div class="bb-label">FIP</div><div class="bb-value">{adv["FIP"]}</div></div>'
-                    f'<div class="border-badge border-blue"><div class="bb-label">K%</div><div class="bb-value">{k_val}</div></div>'
-                    f'<div class="border-badge border-blue"><div class="bb-label">BB%</div><div class="bb-value">{bb_val}</div></div>'
-                )
-                st.markdown(
-                    f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}{row3_html}</div>', 
-                    unsafe_allow_html=True
-                )
-            else:
-                st.markdown(
-                    f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>', 
-                    unsafe_allow_html=True
-                )
+            # 5. 깔끔하게 2줄로 렌더링
+            st.markdown(
+                f'<div class="pitcher-stat-grid" style="margin: 8px 0 4px 0;">{row1_html}{row2_html}</div>', 
+                unsafe_allow_html=True
+            )
 
         # 🔥 [NEW] 노게임 팀 패널
         elif status == '노게임':
