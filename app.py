@@ -164,6 +164,7 @@ db_overrides = {}
 db_absences = {}
 db_excluded = set()
 db_cancels = set()
+db_nogames = {}  # 🔥 [NEW] 노게임: {(팀, 날짜str): 투수명}
 
 for _, row in db_df.iterrows():
     if pd.isna(row.get('팀')) or pd.isna(row.get('선수')): continue
@@ -180,6 +181,8 @@ for _, row in db_df.iterrows():
         db_excluded.add((t, p))
     elif m_type == "우천취소":
         db_cancels.add((t, d_str))
+    elif m_type == "노게임":  # 🔥 [NEW]
+        db_nogames[(t, d_str)] = p
 
 _defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'cancels': set(), 'admin_unlocked': False}
 for k, v in _defaults.items():
@@ -229,7 +232,7 @@ if show_admin:
             custom_player = st.text_input("직접 입력 (콜업 등)", placeholder="예: 양창섭")
             final_player = custom_player if custom_player else m_player
         with c3:
-            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외", "우천취소"], key="adm_type", horizontal=True)
+            m_type = st.radio("변동 유형", ["선발 지정", "휴식/말소", "로테이션 제외", "우천취소", "노게임"], key="adm_type", horizontal=True)
             
         c4, c5 = st.columns([3, 1])
         with c4:
@@ -241,6 +244,9 @@ if show_admin:
                 st.info("☔ 해당 날짜의 경기를 우천취소 처리하여 로테이션을 하루 밉니다.")
                 m_date = st.date_input("우천취소 날짜", value=date.today())
                 final_player = "팀전체"
+            elif m_type == "노게임":  # 🔥 [NEW]
+                st.info("🚫 던지다 취소된 노게임 처리입니다. 각 팀별로 선발투수를 따로 등록해주세요.")
+                m_date = st.date_input("노게임 날짜", value=date.today())
             else:
                 st.info("🚫 해당 투수를 선발 로테이션 계산에서 즉시 제외합니다.")
                 m_date = date.today()
@@ -264,7 +270,7 @@ if show_admin:
             st.markdown("**📋 현재 DB 등록 현황**")
             for i, row in db_df.iterrows():
                 t, p, typ, d = row['팀'], row['선수'], row['타입'], row['날짜']
-                icon = "🎯" if typ == "선발 지정" else ("⏸️" if typ == "휴식/말소" else "🚫")
+                icon = "🎯" if typ == "선발 지정" else ("⏸️" if typ == "휴식/말소" else ("🚫" if typ == "노게임" else "☔" if typ == "우천취소" else "🚫"))
                 dc1, dc2 = st.columns([4, 1])
                 with dc1:
                     if typ == "로테이션 제외":
@@ -310,6 +316,14 @@ for (team, dt_str), pitcher in st.session_state.overrides.items():
     if mask.any():
         working_df.loc[mask, '선발투수'] = pitcher
         working_df.loc[mask, '상태'] = '수동확정'
+
+# 🔥 [NEW] 노게임 DB 적용: 해당 팀+날짜를 노게임 상태로 변경
+for (team, dt_str), pitcher in db_nogames.items():
+    dt_pd = pd.to_datetime(dt_str)
+    mask = (working_df['팀'] == team) & (working_df['날짜'] == dt_pd)
+    if mask.any():
+        working_df.loc[mask, '선발투수'] = pitcher
+        working_df.loc[mask, '상태'] = '노게임'
 
 year, month = st.session_state.cal_year, st.session_state.cal_month
 month_df = working_df[(working_df['날짜'].dt.year == year) & (working_df['날짜'].dt.month == month)]

@@ -115,16 +115,14 @@ def master_collector_v21():
                             base_data = base_res.json()
                             game_info = base_data.get('result', {}).get('game', {})
                             game_status = game_info.get('statusCode', '')
-                            # 🔥 [NEW] cancel 플래그 확인 (던지다 취소된 노게임 감지용)
-                            is_cancelled = game_info.get('cancel', False)
 
                             # 🔥 [핵심 로직] 네이버 API 상태값을 최우선으로 믿기!
-                            if game_status == 'RESULT':
+                            if game_status == 'CANCEL':
+                                status = '우천취소'
+                            elif game_status == 'RESULT':
                                 status = '종료'
-                            elif game_status == 'CANCEL' or is_cancelled:
-                                status = '우천취소'  # 노게임 여부는 아래에서 추가 확인
                             else:
-                                status = '예정'  # 🔥 1.2이닝 방어! (RESULT 빼고 PLAYING, STARTED 등 무조건 예정 처리)
+                                status = '예정' # 🔥 1.2이닝 방어! (RESULT 빼고 PLAYING, STARTED 등 무조건 예정 처리)
 
                             if status == '예정' and game_date_obj < today_obj:
                                 status = '우천취소'
@@ -133,48 +131,11 @@ def master_collector_v21():
                             a_inn, a_np, a_hit, a_sasa, a_er = '-', '-', '-', '-', '-'
                             h_inn, h_np, h_hit, h_sasa, h_er = '-', '-', '-', '-', '-'
 
-                            # 🔥 [NEW] get_stats 헬퍼를 공통으로 쓰기 위해 바깥으로 추출
-                            def get_stats(p):
-                                name = p.get('name', '')
-                                inn = p.get('inn', '0')
-                                np_val = p.get('bf', '0') 
-                                hit = p.get('hit', '0')
-                                sasa = str(int(p.get('bb', 0)) + int(p.get('hp', 0))) 
-                                er = p.get('er', '0')
-                                return name, inn, np_val, hit, sasa, er
-
                             if status == '우천취소':
-                                # 🔥 [NEW] 던지다 취소된 노게임인지 확인!
-                                # cancel=True여도 pitchersBoxscore에 이닝 데이터가 있으면 노게임
-                                try:
-                                    record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
-                                    rec_res = requests.get(record_url, headers=headers, timeout=5)
-                                    if rec_res.status_code == 200:
-                                        rec_data = rec_res.json()
-                                        recordData = rec_data.get('result', {}).get('recordData') or {}
-                                        if 'pitchersBoxscore' in recordData:
-                                            pitchers = recordData['pitchersBoxscore']
-                                            away_list = pitchers.get('away', [])
-                                            home_list = pitchers.get('home', [])
-                                            if away_list and home_list:
-                                                a_inn_check = str(away_list[0].get('inn', '0')).strip()
-                                                # 이닝이 '0' '0.0' '-' 이 아니면 실제로 던진 것 → 노게임!
-                                                if a_inn_check and a_inn_check not in ('0', '0.0', '-', ''):
-                                                    status = '노게임'
-                                                    a_name, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(away_list[0])
-                                                    h_name, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(home_list[0])
-                                                    new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_name, a_inn, a_np, a_hit, a_sasa, a_er])
-                                                    new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_name, h_inn, h_np, h_hit, h_sasa, h_er])
-                                                    print(f"   🚫 {current_date_str} | {away_team}({a_name}) vs {home_team}({h_name}) [저장: 노게임]")
-                                                    is_saved = True
-                                except Exception as e:
-                                    pass
-
-                                if not is_saved:
-                                    new_data.append([current_date_str, away_team, home_team, '원정', '우천취소', '-', '-', '-', '-', '-', '-', '-', '-'])
-                                    new_data.append([current_date_str, home_team, away_team, '홈', '우천취소', '-', '-', '-', '-', '-', '-', '-', '-'])
-                                    print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
-                                    is_saved = True
+                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', '-', '-', '-', '-', '-', '-'])
+                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', '-', '-', '-', '-', '-', '-'])
+                                print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
+                                is_saved = True
 
                             elif status == '종료':
                                 record_url = f"https://api-gw.sports.naver.com/schedule/games/{game_id}/record"
@@ -185,6 +146,15 @@ def master_collector_v21():
                                     if 'pitchersBoxscore' in recordData:
                                         pitchers = recordData['pitchersBoxscore']
                                         if pitchers.get('away') and pitchers.get('home') and len(pitchers['away']) > 0 and len(pitchers['home']) > 0:
+                                            def get_stats(p):
+                                                name = p.get('name', '')
+                                                inn = p.get('inn', '0')
+                                                np = p.get('bf', '0') 
+                                                hit = p.get('hit', '0')
+                                                sasa = str(int(p.get('bb', 0)) + int(p.get('hp', 0))) 
+                                                er = p.get('er', '0')
+                                                return name, inn, np, hit, sasa, er
+
                                             a_name, a_inn, a_np, a_hit, a_sasa, a_er = get_stats(pitchers['away'][0])
                                             h_name, h_inn, h_np, h_hit, h_sasa, h_er = get_stats(pitchers['home'][0])
                                             

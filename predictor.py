@@ -146,28 +146,34 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     return predicted_pitcher, rot_df[['선발투수', '휴식일']], is_official
 
 def get_pitcher_recent_stats(df, pitcher_name, target_date, n=5):
-    # 🔥 [NEW] 노게임도 포함
+    # 공식 기록(종료)만 테이블에 표시 — 노게임은 성적 집계 X, 휴식일 계산에만 반영
+    target_dt = pd.to_datetime(target_date)
     pitcher_df = df[
         (df['선발투수'] == pitcher_name) &
-        (df['상태'].isin(['종료', '노게임'])) &
-        (df['날짜'] < pd.to_datetime(target_date))
+        (df['상태'] == '종료') &
+        (df['날짜'] < target_dt)
     ].copy().sort_values('날짜')
     if pitcher_df.empty: return pd.DataFrame()
 
-    pitcher_df['휴식일'] = (pitcher_df['날짜'].diff().dt.days - 1).fillna(0).astype(int)
-    pitcher_df.loc[pitcher_df['휴식일'] < 0, '휴식일'] = 0
-    
+    # 휴식일은 노게임 포함한 실제 최근 등판 기준으로 계산
+    all_pitching = df[
+        (df['선발투수'] == pitcher_name) &
+        (df['상태'].isin(['종료', '노게임'])) &
+        (df['날짜'] < target_dt)
+    ].sort_values('날짜')
+
+    rest_days_list = []
+    for _, row in pitcher_df.iterrows():
+        prev = all_pitching[all_pitching['날짜'] < row['날짜']]
+        rest = max(0, (row['날짜'] - prev.iloc[-1]['날짜']).days - 1) if not prev.empty else 0
+        rest_days_list.append(rest)
+    pitcher_df['휴식일'] = rest_days_list
+
     recent = pitcher_df.tail(n).copy()
     recent['날짜'] = recent['날짜'].dt.strftime('%m/%d')
-    
+
     for col in ['투구수', '피안타', '사사구', '자책점']:
         recent[col] = pd.to_numeric(recent[col], errors='coerce').fillna(0).astype(int)
-
-    # 🔥 [NEW] 노게임 행은 상대팀 앞에 🚫 표시
-    recent['상대팀'] = recent.apply(
-        lambda row: f"🚫{row['상대팀']}" if row.get('상태') == '노게임' else row['상대팀'],
-        axis=1
-    )
 
     recent = recent[['날짜', '상대팀', '이닝', '자책점', '피안타', '사사구', '투구수', '휴식일']].reset_index(drop=True)
 
@@ -231,10 +237,10 @@ def get_season_stats(df, pitcher_name, target_date):
     }
 
 def get_recent_rotation_list(df, team, target_date, n=10):
-    # 🔥 [NEW] 노게임도 포함
+    # 공식 기록(종료)만 로테이션 테이블에 표시
     team_df = df[
         (df['팀'] == team) &
-        (df['상태'].isin(['종료', '노게임'])) &
+        (df['상태'] == '종료') &
         (df['선발투수'] != '-') &
         (df['날짜'] < pd.to_datetime(target_date))
     ].copy().sort_values('날짜', ascending=False)
@@ -247,7 +253,7 @@ def get_recent_rotation_list(df, team, target_date, n=10):
     for _, row in recent.iterrows():
         p_name = row['선발투수']
         p_date = row['날짜']
-        # 🔥 [NEW] 노게임 포함해서 이전 등판 찾기
+        # 휴식일은 노게임 포함해서 계산 (실제로 던진 날 기준)
         prev_games = df[
             (df['선발투수'] == p_name) &
             (df['상태'].isin(['종료', '노게임'])) &
@@ -264,12 +270,6 @@ def get_recent_rotation_list(df, team, target_date, n=10):
 
     for c in ['투구수', '자책점']:
         recent[c] = pd.to_numeric(recent[c], errors='coerce').fillna(0).astype(int)
-
-    # 🔥 [NEW] 노게임 행은 선발투수 앞에 🚫 표시
-    recent['선발투수'] = recent.apply(
-        lambda row: f"🚫{row['선발투수']}" if row.get('상태') == '노게임' else row['선발투수'],
-        axis=1
-    )
 
     recent = recent[['날짜', '상대팀', '선발투수', '이닝', '자책점', '투구수', '휴식일']].reset_index(drop=True)
 
