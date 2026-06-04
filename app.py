@@ -184,7 +184,8 @@ for _, row in db_df.iterrows():
     elif m_type == "노게임":  # 🔥 [NEW]
         db_nogames[(t, d_str)] = p
 
-_defaults = {'cal_year': 2026, 'cal_month': 5, 'selected_date': date(2026, 5, 4), 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'cancels': set(), 'admin_unlocked': False}
+_today = date.today()
+_defaults = {'cal_year': _today.year, 'cal_month': _today.month, 'selected_date': _today, 'selected_game': None, 'pitcher_away': None, 'pitcher_home': None, 'my_team': '삼성', 'overrides': {}, 'absences': {}, 'cancels': set(), 'admin_unlocked': False}
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
