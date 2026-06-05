@@ -408,13 +408,20 @@ for week in cal_module.monthcalendar(year, month):
 
                 if st.button(btn_label, key=f"cd_{year}_{month}_{day}", type="primary" if is_sel else "secondary", use_container_width=True):
                     st.session_state.selected_date = date(year, month, day)
-                    st.session_state.pitcher_away = None 
-                    st.session_state.pitcher_home = None 
+                    st.session_state.pitcher_away = None
+                    st.session_state.pitcher_home = None
                     if not my_day_game.empty:
                         r = my_day_game.iloc[0]
                         st.session_state.selected_game = {'away': r['팀'], 'home': r['상대팀'], 'status': r['상태'], 'away_score': r['득점'], 'home_score': r['실점']}
                     else:
-                        st.session_state.selected_game = None
+                        # my_team 경기 없는 날 → 첫 번째 경기 자동 선택
+                        day_pd = pd.to_datetime(date(year, month, day))
+                        day_matchups = working_df[(working_df['날짜'] == day_pd) & (working_df['구장'] == '원정')]
+                        if not day_matchups.empty:
+                            fr = day_matchups.iloc[0]
+                            st.session_state.selected_game = {'away': fr['팀'], 'home': fr['상대팀'], 'status': fr['상태'], 'away_score': fr['득점'], 'home_score': fr['실점']}
+                        else:
+                            st.session_state.selected_game = None
                     st.rerun()
             else: 
                 st.markdown(f'<div class="cal-noGame">{day} ⚪</div>', unsafe_allow_html=True)
@@ -461,11 +468,12 @@ if not matchups.empty:
             </div>
             """, unsafe_allow_html=True)
 
-            if st.button("✔ 보는 중" if is_sel else "경기 보기", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
-                st.session_state.selected_game = {'away': row['원정팀'], 'home': row['홈팀'], 'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']}
-                st.session_state.pitcher_away = None 
-                st.session_state.pitcher_home = None 
-                st.rerun()
+            if not is_sel:
+                if st.button("경기 보기", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
+                    st.session_state.selected_game = {'away': row['원정팀'], 'home': row['홈팀'], 'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']}
+                    st.session_state.pitcher_away = None
+                    st.session_state.pitcher_home = None
+                    st.rerun()
 
 if not st.session_state.selected_game: st.stop()
 
@@ -761,7 +769,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
-                info_html = " <span style='color:#cbd5e0; margin: 0 10px;'>/</span> ".join(info_badges)
+                separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"
+                info_html = separator.join(info_badges)
             else:
                 info_html = ""
 
