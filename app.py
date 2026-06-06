@@ -780,9 +780,15 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             elif pitcher_source == "DB 공식":
                 s_icon, s_text, s_color = "📌", f"DB: {show_pitcher}", "#c05621"
             elif pitcher_source == "오피셜":
-                s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a"
+                if show_pitcher == predicted:
+                    s_icon, s_text, s_color = "✅", f"오피셜: {show_pitcher}", "#2f855a"
+                else:
+                    s_icon, s_text, s_color = "🔍", f"{show_pitcher} (오피셜: {predicted})", "#2b6cb0"
             else:
-                s_icon, s_text, s_color = "🤖", f"자동 예측: {show_pitcher}", "#4a5568"
+                if show_pitcher == predicted:
+                    s_icon, s_text, s_color = "🤖", f"자동 예측: {show_pitcher}", "#4a5568"
+                else:
+                    s_icon, s_text, s_color = "🔍", f"{show_pitcher} (예측: {predicted})", "#4a5568"
 
             info_badges = []
 
