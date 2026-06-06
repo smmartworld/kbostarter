@@ -36,6 +36,8 @@ st.markdown("""
     .cal-empty { height: 36px; }
     .cal-noGame { text-align: center; padding: 6px 0; font-size: 0.88rem; color: #cbd5e0; height: 36px; }
     
+    .match-card { background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px 8px; text-align: center; margin-bottom: 4px; min-height: 100px; }
+    .match-card.sel { background: #ebf8ff; border-color: #4299e1; }
     .mc-teams { font-size: 0.88rem; font-weight: 700; color: #2d3748; margin-top: 4px; }
     .mc-done { font-size: 0.78rem; color: #276749; font-weight: 600; }
     .mc-plan { font-size: 0.78rem; color: #c05621; font-weight: 600; }
@@ -80,8 +82,6 @@ st.markdown("""
     div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
     div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
     .nav-button-container div[data-testid="stButton"] button { min-height: 40px !important; padding: 4px 8px !important; }
-    .matchcard-btn div[data-testid="stButton"] button { min-height: 24px !important; height: 24px !important; padding: 0px 6px !important; font-size: 0.72rem !important; color: #a0aec0 !important; background: transparent !important; border: 1px dashed #e2e8f0 !important; border-radius: 6px !important; box-shadow: none !important; }
-    .matchcard-btn div[data-testid="stButton"] button p { font-size: 0.72rem !important; line-height: 1 !important; color: #a0aec0 !important; }
     
     .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-local { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
@@ -408,13 +408,20 @@ for week in cal_module.monthcalendar(year, month):
 
                 if st.button(btn_label, key=f"cd_{year}_{month}_{day}", type="primary" if is_sel else "secondary", use_container_width=True):
                     st.session_state.selected_date = date(year, month, day)
-                    st.session_state.pitcher_away = None 
-                    st.session_state.pitcher_home = None 
+                    st.session_state.pitcher_away = None
+                    st.session_state.pitcher_home = None
                     if not my_day_game.empty:
                         r = my_day_game.iloc[0]
                         st.session_state.selected_game = {'away': r['팀'], 'home': r['상대팀'], 'status': r['상태'], 'away_score': r['득점'], 'home_score': r['실점']}
                     else:
-                        st.session_state.selected_game = None
+                        # my_team 경기 없는 날 → 첫 번째 경기 자동 선택
+                        day_pd = pd.to_datetime(date(year, month, day))
+                        day_matchups = working_df[(working_df['날짜'] == day_pd) & (working_df['구장'] == '원정')]
+                        if not day_matchups.empty:
+                            fr = day_matchups.iloc[0]
+                            st.session_state.selected_game = {'away': fr['팀'], 'home': fr['상대팀'], 'status': fr['상태'], 'away_score': fr['득점'], 'home_score': fr['실점']}
+                        else:
+                            st.session_state.selected_game = None
                     st.rerun()
             else: 
                 st.markdown(f'<div class="cal-noGame">{day} ⚪</div>', unsafe_allow_html=True)
@@ -430,66 +437,43 @@ if not matchups.empty:
     for i, (_, row) in enumerate(matchups.reset_index().iterrows()):
         with mcols[i % 5]:
             is_sel = (st.session_state.selected_game and st.session_state.selected_game['away'] == row['원정팀'])
-
-            if row['상태'] == '종료':
-                status_html = f'<div class="mc-done">✅ {row["원정점수"]}:{row["홈점수"]}</div>'
-            elif row['상태'] == '우천취소':
-                status_html = '<div class="mc-cancel">☔ 우천취소</div>'
-            elif row['상태'] == '노게임':
-                status_html = '<div class="mc-nogame">🚫 노게임</div>'
-            elif row['상태'] == '수동확정':
-                status_html = '<div class="mc-manual">🛠️ 수동확정</div>'
-            else:
-                status_html = '<div class="mc-plan">⏰ 예정</div>'
-
+            card_cls = "match-card sel" if is_sel else "match-card"
+            
+            if row['상태'] == '종료': status_html = f'<div class="mc-done">✅ {row["원정점수"]}:{row["홈점수"]}</div>'
+            elif row['상태'] == '우천취소': status_html = '<div class="mc-cancel">☔ 우천취소</div>'
+            # 🔥 [NEW] 노게임 매치카드
+            elif row['상태'] == '노게임': status_html = '<div class="mc-nogame">🚫 노게임</div>'
+            elif row['상태'] == '수동확정': status_html = '<div class="mc-manual">🛠️ 수동확정</div>'
+            else: status_html = '<div class="mc-plan">⏰ 예정</div>'
+            
+            c_away, c_home = TEAM_COLORS.get(row['원정팀'], '#000'), TEAM_COLORS.get(row['홈팀'], '#000')
+            
             away_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['원정팀']}.png"
             home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
             fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
 
-            border = "2px solid #4299e1" if is_sel else "1.5px solid #e2e8f0"
-            bg = "#ebf8ff" if is_sel else "#f7fafc"
-            shadow = "0 0 0 3px #bee3f8" if is_sel else "0 1px 3px rgba(0,0,0,0.06)"
-            card_id = f"mc_{i}_{row['원정팀'].replace(' ', '')}"
-
             st.markdown(f"""
-                <div style="background:{bg}; border:{border}; box-shadow:{shadow};
-                            border-radius:12px; padding:10px 8px; text-align:center;
-                            font-family:'Malgun Gothic',sans-serif; margin-bottom:4px;">
-                    <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
-                        <div class="mc-logo-wrap">
-                            <img src="{away_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
-                        </div>
-                        <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
-                        <div class="mc-logo-wrap">
-                            <img src="{home_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
-                        </div>
+            <div class="{card_cls}">
+                <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
+                    <div class="mc-logo-wrap">
+                        <img src="{away_logo}" onerror="this.onerror=null; this.src='{fallback_logo}'">
                     </div>
-                    <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
-                    {status_html}
+                    <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
+                    <div class="mc-logo-wrap">
+                        <img src="{home_logo}" onerror="this.onerror=null; this.src='{fallback_logo}'">
+                    </div>
                 </div>
+                <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
+                {status_html}
+            </div>
             """, unsafe_allow_html=True)
 
-<<<<<<< HEAD
-            if is_sel:
-                st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="matchcard-btn">', unsafe_allow_html=True)
-                if st.button("선택", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
-                    st.session_state.selected_game = {
-                        'away': row['원정팀'], 'home': row['홈팀'],
-                        'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']
-                    }
+            if not is_sel:
+                if st.button("경기 보기", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
+                    st.session_state.selected_game = {'away': row['원정팀'], 'home': row['홈팀'], 'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']}
                     st.session_state.pitcher_away = None
                     st.session_state.pitcher_home = None
                     st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
-=======
-            if st.button("✔ 보는 중" if is_sel else "경기 보기", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
-                st.session_state.selected_game = {'away': row['원정팀'], 'home': row['홈팀'], 'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']}
-                st.session_state.pitcher_away = None 
-                st.session_state.pitcher_home = None 
-                st.rerun()
->>>>>>> parent of f661964 (default click)
 
 if not st.session_state.selected_game: st.stop()
 
@@ -785,9 +769,10 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
-                info_html = " <span style='color:#cbd5e0; margin: 0 10px;'>/</span> ".join(info_badges)
+                separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"
+                info_html = separator.join(info_badges)
             else:
-                info_html = "<span style='color:#a0aec0;'>특이사항 없음</span>"
+                info_html = ""
 
             scoreboard_html = f"""
             <div style="
@@ -839,9 +824,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         btn_text = f"{pname}\n({return_date_str} 복귀)"
                     elif pname == predicted:
                         if is_official:
-                            btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
+                            btn_text = f"✅오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
-                            btn_text = f"🎯 예상\n{pname}\n({rot_row['휴식일']}일)"
+                            btn_text = f"🎯예상\n{pname}\n({rot_row['휴식일']}일)"
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
