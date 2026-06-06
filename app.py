@@ -80,6 +80,8 @@ st.markdown("""
     div[data-testid="stButton"] button { height: auto !important; min-height: 75px !important; padding: 6px 2px !important; }
     div[data-testid="stButton"] button p { white-space: pre-wrap !important; word-break: keep-all !important; line-height: 1.4 !important; font-size: 0.85rem !important; }
     .nav-button-container div[data-testid="stButton"] button { min-height: 40px !important; padding: 4px 8px !important; }
+    .matchcard-btn div[data-testid="stButton"] button { min-height: 24px !important; height: 24px !important; padding: 0px 6px !important; font-size: 0.72rem !important; color: #a0aec0 !important; background: transparent !important; border: 1px dashed #e2e8f0 !important; border-radius: 6px !important; box-shadow: none !important; }
+    .matchcard-btn div[data-testid="stButton"] button p { font-size: 0.72rem !important; line-height: 1 !important; color: #a0aec0 !important; }
     
     .absence-badge { background: #fff5f5; border: 1px solid #fed7d7; color: #c53030; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
     .absence-badge-local { background: #ebf8ff; border: 1px solid #bee3f8; color: #2b6cb0; padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; font-weight: 700; display: inline-block; margin-bottom: 8px;}
@@ -457,31 +459,9 @@ if not matchups.empty:
             card_id = f"mc_{i}_{row['원정팀'].replace(' ', '')}"
 
             st.markdown(f"""
-            <style>
-                #{card_id}_wrap {{
-                    position: relative;
-                }}
-                #{card_id}_wrap > div[data-testid="stButton"] {{
-                    position: absolute;
-                    top: 0; left: 0; right: 0; bottom: 0;
-                    z-index: 10;
-                }}
-                #{card_id}_wrap > div[data-testid="stButton"] button {{
-                    width: 100% !important;
-                    height: 100% !important;
-                    opacity: 0 !important;
-                    cursor: {"default" if is_sel else "pointer"} !important;
-                    min-height: unset !important;
-                    padding: 0 !important;
-                    border: none !important;
-                    background: transparent !important;
-                    box-shadow: none !important;
-                }}
-            </style>
-            <div id="{card_id}_wrap">
                 <div style="background:{bg}; border:{border}; box-shadow:{shadow};
                             border-radius:12px; padding:10px 8px; text-align:center;
-                            font-family:'Malgun Gothic',sans-serif; pointer-events:none;">
+                            font-family:'Malgun Gothic',sans-serif; margin-bottom:4px;">
                     <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
                         <div class="mc-logo-wrap">
                             <img src="{away_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
@@ -494,11 +474,13 @@ if not matchups.empty:
                     <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
                     {status_html}
                 </div>
-            </div>
             """, unsafe_allow_html=True)
 
-            if not is_sel:
-                if st.button("　", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
+            if is_sel:
+                st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="matchcard-btn">', unsafe_allow_html=True)
+                if st.button("선택", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
                     st.session_state.selected_game = {
                         'away': row['원정팀'], 'home': row['홈팀'],
                         'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']
@@ -506,6 +488,7 @@ if not matchups.empty:
                     st.session_state.pitcher_away = None
                     st.session_state.pitcher_home = None
                     st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
 if not st.session_state.selected_game: st.stop()
 
