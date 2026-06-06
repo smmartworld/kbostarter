@@ -189,6 +189,39 @@ _defaults = {'cal_year': _today.year, 'cal_month': _today.month, 'selected_date'
 for k, v in _defaults.items():
     if k not in st.session_state: st.session_state[k] = v
 
+# ✅ 앱 첫 실행 시 오늘 날짜 응원팀 경기 자동 선택
+if st.session_state.selected_game is None:
+    _today_pd = pd.to_datetime(_today)
+    _my_team = st.session_state.my_team
+    _today_games = original_df[
+        (original_df['날짜'] == _today_pd) &
+        (original_df['구장'] == '원정') &
+        ((original_df['팀'] == _my_team) | (original_df['상대팀'] == _my_team))
+    ]
+    if not _today_games.empty:
+        _r = _today_games.iloc[0]
+        st.session_state.selected_game = {
+            'away': _r['팀'],
+            'home': _r['상대팀'],
+            'status': _r['상태'],
+            'away_score': _r['득점'],
+            'home_score': _r['실점']
+        }
+    else:
+        _today_all = original_df[
+            (original_df['날짜'] == _today_pd) &
+            (original_df['구장'] == '원정')
+        ]
+        if not _today_all.empty:
+            _r = _today_all.iloc[0]
+            st.session_state.selected_game = {
+                'away': _r['팀'],
+                'home': _r['상대팀'],
+                'status': _r['상태'],
+                'away_score': _r['득점'],
+                'home_score': _r['실점']
+            }
+
 st.markdown('<div class="main-title">⚾선발누구⚾</div>', unsafe_allow_html=True)
 
 col_a, col_b, col_c = st.columns([1, 2, 1])
