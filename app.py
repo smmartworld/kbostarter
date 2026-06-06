@@ -431,112 +431,81 @@ matchups = day_df[day_df['구장'] == '원정'][['팀', '상대팀', '상태', '
 matchups.columns = ['원정팀', '홈팀', '상태', '원정점수', '홈점수']
 
 if not matchups.empty:
-    # sendPrompt로 카드 클릭 신호 수신
-    if 'select_game_signal' not in st.session_state:
-        st.session_state.select_game_signal = None
-
-    query_params = st.query_params
-    if 'select_away' in query_params:
-        away_signal = query_params['select_away']
-        match_row = matchups[matchups['원정팀'] == away_signal]
-        if not match_row.empty:
-            r = match_row.iloc[0]
-            st.session_state.selected_game = {
-                'away': r['원정팀'], 'home': r['홈팀'],
-                'status': r['상태'], 'away_score': r['원정점수'], 'home_score': r['홈점수']
-            }
-            st.session_state.pitcher_away = None
-            st.session_state.pitcher_home = None
-            st.query_params.clear()
-            st.rerun()
-
-    cards_html_list = []
+    mcols = st.columns(min(len(matchups), 5))
     for i, (_, row) in enumerate(matchups.reset_index().iterrows()):
-        is_sel = (st.session_state.selected_game and st.session_state.selected_game['away'] == row['원정팀'])
+        with mcols[i % 5]:
+            is_sel = (st.session_state.selected_game and st.session_state.selected_game['away'] == row['원정팀'])
 
-        if row['상태'] == '종료':
-            status_html = f'<div class="mc-done">✅ {row["원정점수"]}:{row["홈점수"]}</div>'
-        elif row['상태'] == '우천취소':
-            status_html = '<div class="mc-cancel">☔ 우천취소</div>'
-        elif row['상태'] == '노게임':
-            status_html = '<div class="mc-nogame">🚫 노게임</div>'
-        elif row['상태'] == '수동확정':
-            status_html = '<div class="mc-manual">🛠️ 수동확정</div>'
-        else:
-            status_html = '<div class="mc-plan">⏰ 예정</div>'
+            if row['상태'] == '종료':
+                status_html = f'<div class="mc-done">✅ {row["원정점수"]}:{row["홈점수"]}</div>'
+            elif row['상태'] == '우천취소':
+                status_html = '<div class="mc-cancel">☔ 우천취소</div>'
+            elif row['상태'] == '노게임':
+                status_html = '<div class="mc-nogame">🚫 노게임</div>'
+            elif row['상태'] == '수동확정':
+                status_html = '<div class="mc-manual">🛠️ 수동확정</div>'
+            else:
+                status_html = '<div class="mc-plan">⏰ 예정</div>'
 
-        away_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['원정팀']}.png"
-        home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
-        fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
+            away_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['원정팀']}.png"
+            home_logo = f"https://raw.githubusercontent.com/smmartworld/kbostarter/main/images/{row['홈팀']}.png"
+            fallback_logo = "https://sports-phinf.pstatic.net/player/kbo/default/empty_player.png"
 
-        border = "2px solid #4299e1" if is_sel else "1.5px solid #e2e8f0"
-        bg = "#ebf8ff" if is_sel else "#f7fafc"
-        shadow = "0 0 0 3px #bee3f8" if is_sel else "0 1px 3px rgba(0,0,0,0.06)"
-        cursor = "default" if is_sel else "pointer"
+            border = "2px solid #4299e1" if is_sel else "1.5px solid #e2e8f0"
+            bg = "#ebf8ff" if is_sel else "#f7fafc"
+            shadow = "0 0 0 3px #bee3f8" if is_sel else "0 1px 3px rgba(0,0,0,0.06)"
+            card_id = f"mc_{i}_{row['원정팀'].replace(' ', '')}"
 
-        cards_html_list.append(f"""
-        <div class="mc-wrap" style="flex:1; min-width:0;">
-            <div class="match-card"
-                style="background:{bg}; border:{border}; box-shadow:{shadow}; border-radius:12px;
-                       padding:10px 8px; text-align:center; cursor:{cursor}; transition:box-shadow 0.15s, border 0.15s;"
-                onclick="if(!{str(is_sel).lower()}){{ window.parent.postMessage({{type:'streamlit:setComponentValue', value:'{row['원정팀']}'}}, '*'); }}"
-                data-away="{row['원정팀']}">
-                <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
-                    <div class="mc-logo-wrap">
-                        <img src="{away_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
+            st.markdown(f"""
+            <style>
+                #{card_id}_wrap {{
+                    position: relative;
+                }}
+                #{card_id}_wrap > div[data-testid="stButton"] {{
+                    position: absolute;
+                    top: 0; left: 0; right: 0; bottom: 0;
+                    z-index: 10;
+                }}
+                #{card_id}_wrap > div[data-testid="stButton"] button {{
+                    width: 100% !important;
+                    height: 100% !important;
+                    opacity: 0 !important;
+                    cursor: {"default" if is_sel else "pointer"} !important;
+                    min-height: unset !important;
+                    padding: 0 !important;
+                    border: none !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }}
+            </style>
+            <div id="{card_id}_wrap">
+                <div style="background:{bg}; border:{border}; box-shadow:{shadow};
+                            border-radius:12px; padding:10px 8px; text-align:center;
+                            font-family:'Malgun Gothic',sans-serif; pointer-events:none;">
+                    <div style="display:flex;justify-content:center;align-items:center;gap:6px;">
+                        <div class="mc-logo-wrap">
+                            <img src="{away_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
+                        </div>
+                        <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
+                        <div class="mc-logo-wrap">
+                            <img src="{home_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
+                        </div>
                     </div>
-                    <span style="color:#a0aec0;font-size:0.75rem;">vs</span>
-                    <div class="mc-logo-wrap">
-                        <img src="{home_logo}" onerror="this.onerror=null;this.src='{fallback_logo}'">
-                    </div>
+                    <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
+                    {status_html}
                 </div>
-                <div class="mc-teams">{row['원정팀']} vs {row['홈팀']}</div>
-                {status_html}
             </div>
-        </div>
-        """)
+            """, unsafe_allow_html=True)
 
-    num_cols = min(len(matchups), 5)
-    cards_combined = "\n".join(cards_html_list)
-
-    components.html(f"""
-    <style>
-        body {{ margin:0; padding:0; font-family:'Malgun Gothic',sans-serif; }}
-        .mc-row {{ display:flex; gap:8px; flex-wrap:nowrap; }}
-        .mc-wrap .match-card:hover {{ box-shadow: 0 0 0 3px #90cdf4 !important; border-color: #90cdf4 !important; }}
-        .mc-teams {{ font-size:0.88rem; font-weight:700; color:#2d3748; margin-top:4px; }}
-        .mc-done {{ font-size:0.78rem; color:#276749; font-weight:600; }}
-        .mc-plan {{ font-size:0.78rem; color:#c05621; font-weight:600; }}
-        .mc-cancel {{ font-size:0.78rem; color:#9b2c2c; }}
-        .mc-nogame {{ font-size:0.78rem; color:#744210; font-weight:700; }}
-        .mc-manual {{ font-size:0.78rem; color:#3182ce; font-weight:800; }}
-        .mc-logo-wrap {{ display:inline-flex; justify-content:center; align-items:center;
-                         width:36px; height:36px; border-radius:50%; overflow:hidden; background:white; }}
-        .mc-logo-wrap img {{ width:100%; height:100%; object-fit:contain; }}
-    </style>
-    <div class="mc-row">
-        {cards_combined}
-    </div>
-    <script>
-        window.addEventListener('message', function(e) {{
-            if (e.data && e.data.type === 'streamlit:setComponentValue') {{
-                var away = e.data.value;
-                var url = new URL(window.parent.location.href);
-                url.searchParams.set('select_away', away);
-                window.parent.location.href = url.toString();
-            }}
-        }});
-
-        document.querySelectorAll('.match-card[data-away]').forEach(function(card) {{
-            card.addEventListener('click', function() {{
-                var away = this.getAttribute('data-away');
-                var url = new URL(window.parent.location.href);
-                url.searchParams.set('select_away', away);
-                window.parent.location.href = url.toString();
-            }});
-        }});
-    </script>
-    """, height=110)
+            if not is_sel:
+                if st.button("　", key=f"gm_{i}_{row['원정팀']}", use_container_width=True):
+                    st.session_state.selected_game = {
+                        'away': row['원정팀'], 'home': row['홈팀'],
+                        'status': row['상태'], 'away_score': row['원정점수'], 'home_score': row['홈점수']
+                    }
+                    st.session_state.pitcher_away = None
+                    st.session_state.pitcher_home = None
+                    st.rerun()
 
 if not st.session_state.selected_game: st.stop()
 
