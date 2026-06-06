@@ -787,7 +787,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"
                 info_html = separator.join(info_badges)
             else:
-                info_html = ""
+                info_html = "<span style='color:#a0aec0;'>특이사항 없음</span>"
 
             scoreboard_html = f"""
             <div style="
@@ -839,9 +839,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                         btn_text = f"{pname}\n({return_date_str} 복귀)"
                     elif pname == predicted:
                         if is_official:
-                            btn_text = f"✅오피셜\n{pname}\n({rot_row['휴식일']}일)"
+                            btn_text = f"✅ 오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
-                            btn_text = f"🎯예상\n{pname}\n({rot_row['휴식일']}일)"
+                            btn_text = f"🎯 예상\n{pname}\n({rot_row['휴식일']}일)"
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
