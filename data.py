@@ -2,7 +2,7 @@ import requests
 import re
 import csv
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 import pandas as pd
 import os
 
@@ -14,13 +14,37 @@ def master_collector_v21():
 
     now_kst = datetime.now(timezone.utc) + timedelta(hours=9)
     today_obj = now_kst.date()
-    start_date = today_obj - timedelta(days=7)
-    end_date = today_obj + timedelta(days=5)
 
-    print(f"🚀 [V21] 라이브 스탯 방어 & 선발투수 보호 모드 가동! 타겟 기간: {start_date} ~ {end_date}")
+    # 상세 수집 범위: 선발투수/경기기록까지 네이버 API로 확인하는 구간
+    # 선발투수는 보통 전날~당일에만 의미가 있으므로 기존처럼 짧게 유지
+    detail_start_date = today_obj - timedelta(days=7)
+    detail_end_date = today_obj + timedelta(days=5)
 
-    months_to_check = list(set([f"{start_date.month:02d}", f"{end_date.month:02d}"]))
-    months_to_check.sort()
+    # 일정 수집 범위: 앱 달력에 보여줄 KBO 편성표 확보 구간
+    # 후반기 일정이 달력에서 비지 않도록 넉넉히 확보하되, 선발 API는 호출하지 않음
+    schedule_start_date = detail_start_date
+    season_scheduled_end = date(2026, 9, 6)  # 2026 KBO 우선 편성 일정 기준
+    schedule_end_date = min(today_obj + timedelta(days=75), season_scheduled_end)
+
+    print(
+        "🚀 [V22] 일정/상세 수집 분리 모드 가동! "
+        f"일정: {schedule_start_date} ~ {schedule_end_date} | "
+        f"상세: {detail_start_date} ~ {detail_end_date}"
+    )
+
+    def get_months_between(start_date, end_date):
+        months = []
+        cur = date(start_date.year, start_date.month, 1)
+        end_month = date(end_date.year, end_date.month, 1)
+        while cur <= end_month:
+            months.append(f"{cur.month:02d}")
+            if cur.month == 12:
+                cur = date(cur.year + 1, 1, 1)
+            else:
+                cur = date(cur.year, cur.month + 1, 1)
+        return months
+
+    months_to_check = get_months_between(schedule_start_date, schedule_end_date)
 
     new_data = []
     
@@ -74,7 +98,7 @@ def master_collector_v21():
             if not current_date_str: continue 
 
             game_date_obj = datetime.strptime(current_date_str, "%Y-%m-%d").date()
-            if not (start_date <= game_date_obj <= end_date):
+            if not (schedule_start_date <= game_date_obj <= schedule_end_date):
                 continue
 
             play_text = next((c.get('Text', '') for c in cells if c.get('Class') == 'play'), "")
@@ -100,9 +124,18 @@ def master_collector_v21():
                 date_id = current_date_str.replace('-', '')
                 away_c = team_codes.get(away_team)
                 home_c = team_codes.get(home_team)
-                is_saved = False 
+                is_saved = False
+                needs_detail_fetch = detail_start_date <= game_date_obj <= detail_end_date
 
-                if away_c and home_c:
+                # 먼 미래 일정은 선발/기록 API를 호출하지 않고 편성표만 저장
+                # 선발투수는 상세 수집 범위에 들어오면 자동으로 채워짐
+                if not needs_detail_fetch:
+                    new_data.append([current_date_str, away_team, home_team, '원정', '예정', '-', '-', '-', '-', '-', '-', '-', '-'])
+                    new_data.append([current_date_str, home_team, away_team, '홈', '예정', '-', '-', '-', '-', '-', '-', '-', '-'])
+                    print(f"   📅 {current_date_str} | {away_team} vs {home_team} [저장: 일정만]")
+                    is_saved = True
+
+                if (not is_saved) and away_c and home_c:
                     game_id = f"{date_id}{away_c}{home_c}02026"
                     headers = {'User-Agent': 'Mozilla/5.0'}
                     
@@ -231,10 +264,13 @@ def master_collector_v21():
         try:
             existing_df = pd.read_csv(file_name)
             existing_df['날짜'] = pd.to_datetime(existing_df['날짜'])
-            mask = (existing_df['날짜'].dt.date >= start_date) & (existing_df['날짜'].dt.date <= end_date)
+            # API가 일부 월만 실패해도 멀쩡한 기존 데이터를 날리지 않도록,
+            # 실제로 새로 수집된 날짜만 교체
+            fetched_dates = set(new_df['날짜'].dt.date.unique())
+            mask = existing_df['날짜'].dt.date.isin(fetched_dates)
             existing_df = existing_df[~mask]
             final_df = pd.concat([existing_df, new_df], ignore_index=True)
-            print("   ✔️ 기존 데이터 도려내고 새 데이터 끼워넣기 성공!")
+            print("   ✔️ 실제 수집된 날짜만 교체 성공!")
         except Exception as e:
             print(f"   ⚠️ 기존 파일 읽기 실패, 덮어씁니다: {e}")
             final_df = new_df
@@ -246,6 +282,10 @@ def master_collector_v21():
     final_df['날짜'] = final_df['날짜'].dt.strftime('%Y-%m-%d')
     final_df.to_csv(file_name, index=False, encoding='utf-8-sig')
     
-    print(f"\n🎉 V21 실시간 업데이트 완료! (크롤링 구간: {start_date} ~ {end_date})")
+    print(
+        f"\n🎉 V22 업데이트 완료! "
+        f"(일정 구간: {schedule_start_date} ~ {schedule_end_date} / "
+        f"상세 구간: {detail_start_date} ~ {detail_end_date})"
+    )
 
 master_collector_v21()
