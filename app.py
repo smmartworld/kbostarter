@@ -101,14 +101,15 @@ from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 SHEET_URL = st.secrets["auth"]["sheet_url"]
 
-@st.cache_data(ttl=1800)
-def load_data():
+@st.cache_data(ttl=300)
+def load_data(file_mtime):
     df = pd.read_csv('로테이션_마스터데이터.csv')
     df['날짜'] = pd.to_datetime(df['날짜'])
     return df
 
 try:
-    original_df = load_data()
+    data_mtime = os.path.getmtime('로테이션_마스터데이터.csv')
+    original_df = load_data(data_mtime)
 except FileNotFoundError:
     st.error("❌ 데이터 파일 없음. data.py 먼저 실행 필요.")
     st.stop()
@@ -150,6 +151,7 @@ def get_advanced_stats(pitcher_name: str) -> dict:
         'BB%': fmt(r.get('BB%'), 1),
     }
 
+@st.cache_data(ttl=300)
 def load_manager_data():
     try:
         db_df = conn.read(spreadsheet=SHEET_URL, usecols=[0,1,2,3], ttl=0)
@@ -224,6 +226,17 @@ if st.session_state.selected_game is None:
 
 st.markdown('<div class="main-title">⚾선발누구⚾</div>', unsafe_allow_html=True)
 
+refresh_col, info_col = st.columns([1, 4])
+with refresh_col:
+    if st.button("🔄 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+with info_col:
+    st.caption(
+        f"데이터 범위: {original_df['날짜'].min().date()} ~ {original_df['날짜'].max().date()} / "
+        f"행 수: {len(original_df)}"
+    )
+
 col_a, col_b, col_c = st.columns([1, 2, 1])
 
 with col_a:
@@ -294,6 +307,7 @@ if show_admin:
                     try:
                         conn.update(spreadsheet=SHEET_URL, data=updated_df)
                         st.success("✅ 시트에 저장됨!")
+                        st.cache_data.clear()
                         time.sleep(0.5)
                         st.rerun()
                     except Exception as e:
@@ -315,6 +329,7 @@ if show_admin:
                     if st.button("✖ 삭제", key=f"del_{i}", use_container_width=True):
                         updated_df = db_df.drop(index=i)
                         conn.update(spreadsheet=SHEET_URL, data=updated_df)
+                        st.cache_data.clear()
                         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 

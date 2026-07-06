@@ -1,0 +1,57 @@
+name: Keep Streamlit Awake
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. This runs every 3 hours.
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium
+
+      - name: Open Streamlit app
+        run: |
+          node <<'JS'
+          const { chromium } = require('playwright');
+
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({
+              viewport: { width: 1365, height: 900 },
+              userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36'
+            });
+
+            const url = 'https://starterwho.streamlit.app/';
+            console.log(`Opening ${url}`);
+
+            await page.goto(url, {
+              waitUntil: 'domcontentloaded',
+              timeout: 120000
+            });
+
+            // Give Streamlit enough time to boot from sleep and establish the app session.
+            await page.waitForTimeout(30000);
+
+            const title = await page.title();
+            console.log(`Visited Streamlit app. Title: ${title}`);
+
+            await browser.close();
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          JS
