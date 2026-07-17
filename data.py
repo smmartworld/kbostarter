@@ -50,12 +50,26 @@ def master_collector_v21():
     
     file_name = '로테이션_마스터데이터.csv'
     saved_starters = {}
+    stale_past_games = set()
     if os.path.exists(file_name):
         try:
             temp_df = pd.read_csv(file_name)
             for _, row in temp_df.iterrows():
                 if pd.notna(row['선발투수']) and row['선발투수'] != '-':
                     saved_starters[(str(row['날짜'])[:10], str(row['팀']))] = row['선발투수']
+
+            # 전체 과거 구간을 다시 스캔하지 않고,
+            # 오늘 이전인데도 '예정'으로 남은 경기만 선택적으로 재확인한다.
+            temp_dates = pd.to_datetime(temp_df['날짜'], errors='coerce')
+            stale_rows = temp_df[(temp_dates.dt.date < today_obj) & (temp_df['상태'] == '예정')]
+            stale_past_games = {
+                (str(row['날짜'])[:10], str(row['팀']), str(row['상대팀']))
+                for _, row in stale_rows.iterrows()
+            }
+
+            # 지난달의 미확인 예정 경기가 있어도 해당 월만 1회 추가 조회한다.
+            stale_months = {date_text[5:7] for date_text, _, _ in stale_past_games}
+            months_to_check = sorted(set(months_to_check) | stale_months)
         except Exception as e:
             pass
 
@@ -98,8 +112,6 @@ def master_collector_v21():
             if not current_date_str: continue 
 
             game_date_obj = datetime.strptime(current_date_str, "%Y-%m-%d").date()
-            if not (schedule_start_date <= game_date_obj <= schedule_end_date):
-                continue
 
             play_text = next((c.get('Text', '') for c in cells if c.get('Class') == 'play'), "")
             if not play_text: continue 
@@ -110,6 +122,14 @@ def master_collector_v21():
             if len(teams) >= 2: 
                 away_team = teams[0].strip()
                 home_team = teams[-1].strip()
+
+                is_stale_past_game = (
+                    (current_date_str, away_team, home_team) in stale_past_games or
+                    (current_date_str, home_team, away_team) in stale_past_games
+                )
+                is_normal_schedule_range = schedule_start_date <= game_date_obj <= schedule_end_date
+                if not is_normal_schedule_range and not is_stale_past_game:
+                    continue
 
                 status = '예정'
                 away_score, home_score = '-', '-'
@@ -125,7 +145,10 @@ def master_collector_v21():
                 away_c = team_codes.get(away_team)
                 home_c = team_codes.get(home_team)
                 is_saved = False
-                needs_detail_fetch = detail_start_date <= game_date_obj <= detail_end_date
+                needs_detail_fetch = (
+                    detail_start_date <= game_date_obj <= detail_end_date or
+                    is_stale_past_game
+                )
 
                 # 먼 미래 일정은 선발/기록 API를 호출하지 않고 편성표만 저장
                 # 선발투수는 상세 수집 범위에 들어오면 자동으로 채워짐
@@ -165,8 +188,12 @@ def master_collector_v21():
                             h_inn, h_np, h_hit, h_sasa, h_er = '-', '-', '-', '-', '-'
 
                             if status == '우천취소':
-                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', '-', '-', '-', '-', '-', '-'])
-                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', '-', '-', '-', '-', '-', '-'])
+                                # 취소 전 이미 발표된 선발이 있었다면 보존한다.
+                                # 다음 실제 경기에서 같은 투수가 이어서 나올 가능성을 예측에 반영하기 위함이다.
+                                a_cancel_starter = saved_starters.get((current_date_str, away_team), '-')
+                                h_cancel_starter = saved_starters.get((current_date_str, home_team), '-')
+                                new_data.append([current_date_str, away_team, home_team, '원정', status, '-', '-', a_cancel_starter, '-', '-', '-', '-', '-'])
+                                new_data.append([current_date_str, home_team, away_team, '홈', status, '-', '-', h_cancel_starter, '-', '-', '-', '-', '-'])
                                 print(f"   ☔ {current_date_str} | {away_team} vs {home_team} [저장: 우천취소]")
                                 is_saved = True
 
@@ -265,12 +292,20 @@ def master_collector_v21():
             existing_df = pd.read_csv(file_name)
             existing_df['날짜'] = pd.to_datetime(existing_df['날짜'])
             # API가 일부 월만 실패해도 멀쩡한 기존 데이터를 날리지 않도록,
-            # 실제로 새로 수집된 날짜만 교체
-            fetched_dates = set(new_df['날짜'].dt.date.unique())
-            mask = existing_df['날짜'].dt.date.isin(fetched_dates)
+            # 실제로 새로 수집된 (날짜, 팀) 행만 교체한다.
+            # 특히 과거 '예정' 경기 하나만 선택 재확인할 때
+            # 같은 날짜의 다른 팀 완료 기록이 삭제되는 것을 막는다.
+            fetched_keys = set(zip(new_df['날짜'].dt.date, new_df['팀'].astype(str)))
+            mask = pd.Series(
+                [
+                    (game_date.date(), str(team)) in fetched_keys
+                    for game_date, team in zip(existing_df['날짜'], existing_df['팀'])
+                ],
+                index=existing_df.index,
+            )
             existing_df = existing_df[~mask]
             final_df = pd.concat([existing_df, new_df], ignore_index=True)
-            print("   ✔️ 실제 수집된 날짜만 교체 성공!")
+            print("   ✔️ 실제 수집된 날짜/팀 행만 교체 성공!")
         except Exception as e:
             print(f"   ⚠️ 기존 파일 읽기 실패, 덮어씁니다: {e}")
             final_df = new_df
