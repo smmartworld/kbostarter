@@ -50,8 +50,12 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     recent_games = known_games.sort_values('날짜', ascending=False).head(21)
     rotation_pitchers = [
         p for p in recent_games['선발투수'].dropna().unique()
-        if p != '-' and p not in excluded_pitchers
+        if p != '-' and (p not in excluded_pitchers or p == official_starter)
     ]
+
+    # 완전 제외된 투수라도 해당 날짜의 오피셜 선발로 발표되면 후보에 복귀시킨다.
+    if official_starter and official_starter not in rotation_pitchers:
+        rotation_pitchers.append(official_starter)
 
     last_known_team_game = known_games['날짜'].max()
 

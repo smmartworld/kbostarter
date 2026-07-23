@@ -785,7 +785,9 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 show_return_date is not None and
                 selected_dt.date() < pd.to_datetime(show_return_date).date()
             )
-            show_is_excluded = show_pitcher in team_db_excluded
+            show_is_official = is_official and show_pitcher == predicted
+            # 완전 제외는 화면에서 숨기되, 새 오피셜 선발 발표가 있으면 그 날짜에 한해 복귀시킨다.
+            show_is_excluded = show_pitcher in team_db_excluded and not show_is_official
             show_is_explicit = (
                 show_pitcher == final_pitcher and
                 pitcher_source in ["로컬 적용", "DB 공식", "오피셜"]
@@ -849,8 +851,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     ret_dt = pd.to_datetime(combined_absences[p]).date()
                     if selected_dt.date() < ret_dt:
                         info_badges.append(f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>")
-                if p in team_db_excluded:
-                    info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
                 separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"
