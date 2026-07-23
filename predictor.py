@@ -53,27 +53,60 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         if p != '-' and p not in excluded_pitchers
     ]
 
-    # 복귀일이 된 기존 선발은 최근 21경기 밖이더라도 후보로 다시 올린다.
+    last_known_team_game = known_games['날짜'].max()
+
+    def get_absence_state(pitcher):
+        """현재 말소 여부와 복귀 후 한 바퀴 유예 여부를 반환한다."""
+        if pitcher not in team_absences:
+            return False, False
+
+        return_dt = pd.to_datetime(team_absences[pitcher]).normalize()
+        is_currently_absent = target_dt.normalize() < return_dt
+
+        post_return_starts = known_games[
+            (known_games['선발투수'] == pitcher) &
+            (known_games['날짜'] >= return_dt)
+        ]
+        team_games_since_return = len(
+            known_games[
+                (known_games['날짜'] >= return_dt) &
+                (known_games['날짜'] <= last_known_team_game)
+            ]
+        )
+        is_return_grace = (
+            not is_currently_absent and
+            post_return_starts.empty and
+            team_games_since_return < 7
+        )
+        return is_currently_absent, is_return_grace
+
+    # 복귀일이 된 기존 선발은 최근 21경기 밖이어도 한 바퀴 동안 후보로 다시 올린다.
+    # 복귀 후 실제 등판이 없는 채 팀이 7경기를 치르면 유예가 끝난다.
     for p, return_date in team_absences.items():
-        is_returned = target_dt.normalize() >= pd.to_datetime(return_date).normalize()
+        is_currently_absent, is_return_grace = get_absence_state(p)
         has_team_history = not known_games[known_games['선발투수'] == p].empty
-        if is_returned and has_team_history and p not in excluded_pitchers and p not in rotation_pitchers:
+        if (
+            not is_currently_absent and
+            is_return_grace and
+            has_team_history and
+            p not in excluded_pitchers and
+            p not in rotation_pitchers
+        ):
             rotation_pitchers.append(p)
 
     rot_data = []
-    last_known_team_game = known_games['날짜'].max() 
 
     simulated_last_pitched = {}
 
     for p in rotation_pitchers:
         p_games = known_games[known_games['선발투수'] == p].sort_values('날짜')
         if not p_games.empty:
+            is_currently_absent, is_return_grace = get_absence_state(p)
+            if is_currently_absent:
+                continue
+
             last_game_dt = p_games.iloc[-1]['날짜']
             simulated_last_pitched[p] = last_game_dt
-            is_returning_from_absence = (
-                p in team_absences and
-                target_dt.normalize() >= pd.to_datetime(team_absences[p]).normalize()
-            )
             
             if pd.notna(last_known_team_game):
                 # 올스타 브레이크나 연속 우취는 날짜만 흐르므로,
@@ -86,7 +119,7 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
                 )
                 if (
                     team_games_since_appearance >= 7 and
-                    not is_returning_from_absence and
+                    not is_return_grace and
                     p != official_starter
                 ):
                     continue 
@@ -96,7 +129,7 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
                 '선발투수': p,
                 '최근등판': last_game_dt,
                 '휴식일': rest_days,
-                '후보보호': is_returning_from_absence or p == official_starter,
+                '후보보호': is_return_grace or p == official_starter,
             })
             
     if not rot_data: return (official_starter if official_starter else "예측 불가"), pd.DataFrame(), is_official

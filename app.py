@@ -779,7 +779,39 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             show_pitcher = st.session_state[pitcher_key]
 
-            if show_pitcher and show_pitcher != "예측 불가" and show_pitcher != "-" and show_pitcher not in rotation_df['선발투수'].values:
+            rotation_names = set(rotation_df['선발투수'].values)
+            show_return_date = combined_absences.get(show_pitcher)
+            show_is_absent = (
+                show_return_date is not None and
+                selected_dt.date() < pd.to_datetime(show_return_date).date()
+            )
+            show_is_excluded = show_pitcher in team_db_excluded
+            show_is_explicit = (
+                show_pitcher == final_pitcher and
+                pitcher_source in ["로컬 적용", "DB 공식", "오피셜"]
+            )
+
+            # 이전에 눌러둔 투수가 말소·제외·자동 탈락한 뒤 후보로 되살아나지 않게 한다.
+            if (
+                show_pitcher and
+                show_pitcher not in rotation_names and
+                (show_is_absent or show_is_excluded or not show_is_explicit)
+            ):
+                if predicted in rotation_names:
+                    show_pitcher = predicted
+                else:
+                    show_pitcher = rotation_df.iloc[0]['선발투수']
+                st.session_state[pitcher_key] = show_pitcher
+
+            # 수동/DB/오피셜 지정만 활성 후보 밖에서도 상세 조회용으로 표시한다.
+            if (
+                show_pitcher and
+                show_pitcher not in rotation_names and
+                show_pitcher != "예측 불가" and
+                show_pitcher != "-" and
+                not show_is_absent and
+                not show_is_excluded
+            ):
                 p_games = working_df[(working_df['팀'] == team) & 
                                      (working_df['상태'].isin(['종료', '수동확정', '노게임'])) & 
                                      (working_df['선발투수'] == show_pitcher) & 
@@ -866,15 +898,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 pname = rot_row['선발투수']
                 with btn_cols[j]:
                     is_active = (show_pitcher == pname)
-                    
-                    is_absent = False
-                    if pname in combined_absences and selected_dt.date() < combined_absences[pname]:
-                        is_absent = True
-                    
-                    if is_absent:
-                        return_date_str = combined_absences[pname].strftime('%m/%d')
-                        btn_text = f"{pname}\n({return_date_str} 복귀)"
-                    elif pname == predicted:
+
+                    if pname == predicted:
                         if is_official:
                             btn_text = f"✅오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
@@ -882,7 +907,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
-                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True, disabled=is_absent):
+                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
                         st.session_state[pitcher_key] = pname; st.rerun()
 
             if show_pitcher:
