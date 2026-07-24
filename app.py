@@ -790,12 +790,34 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     st.session_state[scenario_key] = max_scenario_count
 
                 with st.popover("☔ 우취 발생시"):
-                    scenario_count = int(st.selectbox(
-                        "우취 가정 횟수",
-                        options=list(range(max_scenario_count + 1)),
-                        format_func=lambda count: f"{count}회",
-                        key=scenario_key,
-                    ))
+                    scenario_count = int(st.session_state[scenario_key])
+                    minus_col, count_col, plus_col = st.columns([1, 2, 1])
+
+                    with minus_col:
+                        if st.button(
+                            "−",
+                            key=f"{scenario_key}_minus",
+                            disabled=scenario_count <= 0,
+                            use_container_width=True,
+                        ):
+                            st.session_state[scenario_key] = scenario_count - 1
+                            st.rerun()
+
+                    with count_col:
+                        st.markdown(
+                            f"<div style='text-align:center; font-size:1.05rem; font-weight:800; padding-top:0.4rem;'>{scenario_count}회</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                    with plus_col:
+                        if st.button(
+                            "+",
+                            key=f"{scenario_key}_plus",
+                            disabled=scenario_count >= max_scenario_count,
+                            use_container_width=True,
+                        ):
+                            st.session_state[scenario_key] = scenario_count + 1
+                            st.rerun()
 
                     assumed_cancel_dates = scenario_dates[-scenario_count:] if scenario_count else []
                     if assumed_cancel_dates:
@@ -812,7 +834,18 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             predicted = scenario_predicted
                             rotation_df = scenario_rotation_df
 
-                    st.markdown(f"**변경 예상: {predicted}**")
+                    prediction_col, reset_col = st.columns([3, 1])
+                    with prediction_col:
+                        st.markdown(f"**예측 선발: {predicted}**")
+                    with reset_col:
+                        if st.button(
+                            "초기화",
+                            key=f"{scenario_key}_reset",
+                            disabled=scenario_count == 0,
+                            use_container_width=True,
+                        ):
+                            st.session_state[scenario_key] = 0
+                            st.rerun()
 
             if local_override_val:
                 final_pitcher = local_override_val
