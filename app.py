@@ -781,7 +781,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     if pd.to_datetime(d).strftime("%Y-%m-%d") not in existing_cancel_dates
                 ]
 
-            max_scenario_count = min(3, len(scenario_dates))
+            max_scenario_count = len(scenario_dates)
             if max_scenario_count > 0:
                 scenario_key = f"rainout_scenario_{team}_{dt_str}"
                 if scenario_key not in st.session_state:
@@ -789,13 +789,11 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 elif st.session_state[scenario_key] > max_scenario_count:
                     st.session_state[scenario_key] = max_scenario_count
 
-                with st.popover("☔ 우취 변수"):
-                    st.caption("조회일 직전 예정 경기부터 선발이 이월된다고 가정해.")
-                    scenario_count = int(st.number_input(
+                with st.popover("☔ 우취 발생시"):
+                    scenario_count = int(st.selectbox(
                         "우취 가정 횟수",
-                        min_value=0,
-                        max_value=max_scenario_count,
-                        step=1,
+                        options=list(range(max_scenario_count + 1)),
+                        format_func=lambda count: f"{count}회",
                         key=scenario_key,
                     ))
 
@@ -815,12 +813,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             rotation_df = scenario_rotation_df
 
                     st.markdown(f"**변경 예상: {predicted}**")
-                    if assumed_cancel_dates:
-                        assumed_labels = ", ".join(
-                            pd.to_datetime(d).strftime("%m/%d")
-                            for d in assumed_cancel_dates
-                        )
-                        st.caption(f"가정한 우취: {assumed_labels}")
 
             if local_override_val:
                 final_pitcher = local_override_val
