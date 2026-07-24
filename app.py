@@ -757,6 +757,71 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             db_override_val = db_overrides.get((team, dt_str))
 
+            # 미래 자동 예측에만 간단한 우취 횟수 시뮬레이터를 제공한다.
+            # 조회일 직전 예정 경기부터 취소된다고 가정해 기존 예측기를 다시 실행한다.
+            today_kst = pd.Timestamp.now(tz='Asia/Seoul').tz_localize(None).normalize()
+            can_use_rainout_scenario = (
+                selected_dt > today_kst and
+                not is_official and
+                not local_override_val and
+                not db_override_val
+            )
+            scenario_dates = []
+            if can_use_rainout_scenario:
+                scheduled_rows = working_df[
+                    (working_df['팀'] == team) &
+                    (working_df['날짜'] >= today_kst) &
+                    (working_df['날짜'] < selected_dt) &
+                    (working_df['상태'].isin(['예정', '수동확정']))
+                ]
+                existing_cancel_dates = set(combined_cancels)
+                scenario_dates = [
+                    pd.to_datetime(d).strftime("%Y-%m-%d")
+                    for d in sorted(scheduled_rows['날짜'].dropna().unique())
+                    if pd.to_datetime(d).strftime("%Y-%m-%d") not in existing_cancel_dates
+                ]
+
+            max_scenario_count = min(3, len(scenario_dates))
+            if max_scenario_count > 0:
+                scenario_key = f"rainout_scenario_{team}_{dt_str}"
+                if scenario_key not in st.session_state:
+                    st.session_state[scenario_key] = 0
+                elif st.session_state[scenario_key] > max_scenario_count:
+                    st.session_state[scenario_key] = max_scenario_count
+
+                with st.popover("☔ 우취 변수"):
+                    st.caption("조회일 직전 예정 경기부터 선발이 이월된다고 가정해.")
+                    scenario_count = int(st.number_input(
+                        "우취 가정 횟수",
+                        min_value=0,
+                        max_value=max_scenario_count,
+                        step=1,
+                        key=scenario_key,
+                    ))
+
+                    assumed_cancel_dates = scenario_dates[-scenario_count:] if scenario_count else []
+                    if assumed_cancel_dates:
+                        scenario_cancels = sorted(set(combined_cancels) | set(assumed_cancel_dates))
+                        scenario_predicted, scenario_rotation_df, _ = predict_starter(
+                            working_df,
+                            team,
+                            selected_dt,
+                            team_absences=combined_absences,
+                            excluded_pitchers=team_db_excluded,
+                            team_cancels=scenario_cancels,
+                        )
+                        if not scenario_rotation_df.empty:
+                            predicted = scenario_predicted
+                            rotation_df = scenario_rotation_df
+
+                    st.markdown(f"**변경 예상: {predicted}**")
+                    if assumed_cancel_dates:
+                        assumed_labels = ", ".join(
+                            pd.to_datetime(d).strftime("%m/%d")
+                            for d in assumed_cancel_dates
+                        )
+                        st.caption(f"가정한 우취: {assumed_labels}")
+
             if local_override_val:
                 final_pitcher = local_override_val
                 pitcher_source = "로컬 적용"
