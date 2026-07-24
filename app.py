@@ -790,22 +790,38 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     st.session_state[scenario_key] = max_scenario_count
 
                 with st.popover("☔ 우취 발생시"):
+                    st.markdown(
+                        """
+                        <style>
+                        div[data-testid="stPopoverBody"] div[data-testid="stButton"] button {
+                            min-height: 1.75rem !important;
+                            height: 1.75rem !important;
+                            padding: 0 0.45rem !important;
+                            margin: 0 auto;
+                        }
+                        div[data-testid="stPopoverBody"] div[data-testid="stButton"] button p {
+                            font-size: 0.78rem !important;
+                            line-height: 1 !important;
+                        }
+                        </style>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                     scenario_count = int(st.session_state[scenario_key])
-                    minus_col, count_col, plus_col = st.columns([1, 2, 1])
+                    minus_col, count_col, plus_col = st.columns([1, 3, 1])
 
                     with minus_col:
                         if st.button(
                             "−",
                             key=f"{scenario_key}_minus",
                             disabled=scenario_count <= 0,
-                            use_container_width=True,
                         ):
                             st.session_state[scenario_key] = scenario_count - 1
                             st.rerun()
 
                     with count_col:
                         st.markdown(
-                            f"<div style='text-align:center; font-size:1.05rem; font-weight:800; padding-top:0.4rem;'>{scenario_count}회</div>",
+                            f"<div style='text-align:center; font-size:0.9rem; font-weight:800; padding-top:0.2rem;'>{scenario_count}회</div>",
                             unsafe_allow_html=True,
                         )
 
@@ -814,7 +830,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             "+",
                             key=f"{scenario_key}_plus",
                             disabled=scenario_count >= max_scenario_count,
-                            use_container_width=True,
                         ):
                             st.session_state[scenario_key] = scenario_count + 1
                             st.rerun()
@@ -842,7 +857,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                             "초기화",
                             key=f"{scenario_key}_reset",
                             disabled=scenario_count == 0,
-                            use_container_width=True,
                         ):
                             st.session_state[scenario_key] = 0
                             st.rerun()
