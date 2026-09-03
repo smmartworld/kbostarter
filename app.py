@@ -8,7 +8,7 @@ from datetime import date, timedelta
 from predictor import (
     predict_starter, get_active_rotation,
     get_pitcher_recent_stats, get_season_stats,
-    get_recent_rotation_list, TEAM_COLORS
+    get_recent_rotation_list, TEAM_COLORS, PREDICTOR_VERSION
 )
 
 st.set_page_config(page_title="선발누구⚾", page_icon="⚾", layout="wide")
@@ -234,7 +234,7 @@ with refresh_col:
 with info_col:
     st.caption(
         f"데이터 범위: {original_df['날짜'].min().date()} ~ {original_df['날짜'].max().date()} / "
-        f"행 수: {len(original_df)}"
+        f"행 수: {len(original_df)} / 예측엔진: {PREDICTOR_VERSION}"
     )
 
 col_a, col_b, col_c = st.columns([1, 2, 1])

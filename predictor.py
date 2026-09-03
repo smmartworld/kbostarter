@@ -1,6 +1,8 @@
 import pandas as pd
 from datetime import timedelta
 
+PREDICTOR_VERSION = "V4.1-sim-rest-20260903"
+
 TEAM_COLORS = {
     '삼성': '#074CA1', '두산': '#131230', 'LG': '#C30452', 'KT': '#000000', 'SSG': '#CE0E2D',
     '롯데': '#002955', '한화': '#FF6600', 'KIA': '#EA0029', 'NC': '#315288', '키움': '#570514'
@@ -8,14 +10,23 @@ TEAM_COLORS = {
 
 # 로테이션 판정 기준
 # - 주후보: 마지막 선발 이후 팀이 0~5경기 소화
-# - 보조후보: 6~7경기 소화
-# - 제외: 8경기 이상 소화
-# 날짜 차이가 아니라 '실제로 치른 경기 수'를 보므로 장마/잔여경기/긴 휴식기에 덜 흔들린다.
+# - 보조후보: 6~10경기 소화
+# - 제외: 11경기 이상 소화
+#
+# 미래 예측은 매 경기의 '예측 선발'을 실제 등판한 것으로 가정해 누적한다.
+# 선택 우선순위:
+#   1) 주후보 중 5일 이상 휴식
+#   2) 보조후보 중 5일 이상 휴식
+#   3) 주후보 중 4일 이상 휴식
+#   4) 보조후보 중 4일 이상 휴식
+# 3일 이하 휴식은 자동 예측하지 않는다.
 PRIMARY_MAX_MISSED_GAMES = 5
-BACKUP_MAX_MISSED_GAMES = 7
-MIN_PRIMARY_PITCHERS = 3
+BACKUP_MAX_MISSED_GAMES = 10
 MAX_ROTATION_CANDIDATES = 6
-RECENT_START_WINDOW = 20
+RECENT_START_WINDOW = 24
+
+PREFERRED_REST_DAYS = 5
+MIN_ALLOWED_REST_DAYS = 4
 
 
 def get_active_rotation(df, team, target_date, excluded_pitchers=None):
@@ -45,13 +56,18 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
     """
     선발 예측 + 후보 목록 반환.
 
-    후보 분류 기준은 '마지막 선발 이후 팀이 실제로 몇 경기를 치렀는지'다.
-      - 주후보: 0~5경기
-      - 보조:   6~7경기 (화면에는 표시하지만 기본 예측 큐에는 넣지 않음)
-      - 제외:   8경기 이상
-
-    주후보가 3명 미만이면 보조후보 중 최근성이 높은 투수를 자동 승격한다.
-    공식 선발은 위 기준과 무관하게 우선한다.
+    핵심:
+    1) 후보 탈락은 날짜 차이가 아니라 마지막 선발 이후 '팀이 실제로 치른 경기 수'로 판단한다.
+       - 주후보: 0~5경기
+       - 보조:   6~10경기
+       - 제외:   11경기 이상
+    2) 미래의 각 경기에서 예측된 선발을 실제로 등판했다고 가정하고
+       simulated_last_pitched에 누적한다.
+    3) 다음 경기 선발 선택 때 그 '가상 최근등판일'로 휴식일을 다시 계산한다.
+       - 주후보 5일+ → 보조 5일+ → 주후보 4일+ → 보조 4일+
+       - 3일 이하 휴식은 자동 예측하지 않는다.
+    4) 미래에 공식/수동 선발이 지정돼 있으면 그 날짜에는 해당 선발을 우선하고,
+       이후 시뮬레이션에서도 그 등판을 실제 등판처럼 누적한다.
     """
     if team_absences is None:
         team_absences = {}
@@ -62,10 +78,12 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
 
     target_dt = pd.to_datetime(target_date)
 
+    # 타깃 날짜의 네이버/KBO 오피셜 선발
     official_row = df[
         (df['날짜'] == target_dt) &
         (df['팀'] == team) &
         (df['상태'] == '예정') &
+        (df['선발투수'].notna()) &
         (df['선발투수'] != '-')
     ].copy()
 
@@ -76,8 +94,8 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         if official_starter not in ('nan', ''):
             is_official = True
 
-    # 종료/노게임만 실제로 소화한 팀 경기로 본다.
-    # 우천취소와 미래 '예정'은 로테이션 탈락 판정에 포함하지 않는다.
+    # 실제로 소화된 선발 기록만 기준점으로 사용
+    # 노게임은 기록은 무효지만 실제 투구/휴식에는 영향을 줬으므로 포함
     known_games = df[
         (df['팀'] == team) &
         (df['상태'].isin(['종료', '노게임'])) &
@@ -86,7 +104,6 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         (df['날짜'] < target_dt)
     ].copy()
 
-    # 로컬/DB 우취 처리 날짜는 실제 경기 수에서도 제외
     if team_cancels:
         cancel_dt_list = pd.to_datetime(team_cancels)
         known_games = known_games[~known_games['날짜'].isin(cancel_dt_list)]
@@ -98,6 +115,9 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
             is_official,
         )
 
+    last_known_team_game = known_games['날짜'].max()
+
+    # 최근 실제 선발들에서 최대 6명 후보를 구성
     recent_games = known_games.sort_values('날짜', ascending=False).head(RECENT_START_WINDOW)
     rotation_pitchers = recent_games['선발투수'].dropna().unique()
     rotation_pitchers = [
@@ -105,9 +125,9 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         if p != '-' and p not in excluded_pitchers
     ][:MAX_ROTATION_CANDIDATES]
 
-    last_known_team_game = known_games['날짜'].max()
     simulated_last_pitched = {}
-    candidate_rows = []
+    candidate_roles = {}
+    candidate_missed = {}
 
     for p in rotation_pitchers:
         p_games = known_games[known_games['선발투수'] == p].sort_values('날짜')
@@ -115,160 +135,212 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
             continue
 
         last_game_dt = p_games.iloc[-1]['날짜']
-        simulated_last_pitched[p] = last_game_dt
 
-        # 핵심 변경: 날짜 차이가 아니라 마지막 등판 뒤 실제 팀 경기 수를 센다.
         games_since_last_start = known_games[
             (known_games['날짜'] > last_game_dt) &
             (known_games['날짜'] <= last_known_team_game)
         ]['날짜'].nunique()
 
-        # 공식 선발은 장기 미등판이어도 후보에 복귀시킨다.
         if p == official_starter:
-            rotation_status = '주후보'
+            role = '주후보'
         elif games_since_last_start <= PRIMARY_MAX_MISSED_GAMES:
-            rotation_status = '주후보'
+            role = '주후보'
         elif games_since_last_start <= BACKUP_MAX_MISSED_GAMES:
-            rotation_status = '보조'
+            role = '보조'
         else:
             continue
 
-        rest_days = max(0, (target_dt - last_game_dt).days - 1)
-        candidate_rows.append({
+        simulated_last_pitched[p] = last_game_dt
+        candidate_roles[p] = role
+        candidate_missed[p] = int(games_since_last_start)
+
+    # 후보가 모두 잘렸더라도 타깃 오피셜 선발은 표시/예측 가능
+    if not candidate_roles and not official_starter:
+        return '예측 불가', pd.DataFrame(), is_official
+
+    # 팀 휴식/말소 여부
+    def is_absent(pitcher, sim_date):
+        if pitcher not in team_absences:
+            return False
+        try:
+            return sim_date < pd.to_datetime(team_absences[pitcher])
+        except Exception:
+            return False
+
+    # 현재 시뮬레이션 기준 휴식일
+    def calc_rest_days(pitcher, sim_date):
+        last_dt = simulated_last_pitched.get(pitcher)
+        if last_dt is None or pd.isna(last_dt):
+            return 999
+        return max(0, (sim_date - pd.to_datetime(last_dt)).days - 1)
+
+    # 후보 집단에서 가장 오래 쉰 투수 선택
+    def choose_oldest_eligible(pitchers, sim_date, min_rest):
+        eligible = []
+        for p in pitchers:
+            if is_absent(p, sim_date):
+                continue
+            rest = calc_rest_days(p, sim_date)
+            if rest >= min_rest:
+                last_dt = simulated_last_pitched.get(p)
+                # 오래 쉰 순 → 실제 최근등판이 오래된 순
+                sort_dt = pd.Timestamp.min if last_dt is None or pd.isna(last_dt) else pd.to_datetime(last_dt)
+                eligible.append((p, rest, sort_dt))
+
+        if not eligible:
+            return None
+
+        eligible.sort(key=lambda x: (-x[1], x[2], x[0]))
+        return eligible[0][0]
+
+    def choose_predicted_pitcher(sim_date):
+        primary = [
+            p for p, role in candidate_roles.items()
+            if role in ('주후보', '가상승격')
+        ]
+        backup = [
+            p for p, role in candidate_roles.items()
+            if role == '보조'
+        ]
+
+        # 일반적인 KBO 잔여경기 흐름:
+        # 충분히 쉰 기존 로테 → 충분히 쉰 보조 → 4일 휴식 기존 → 4일 휴식 보조
+        choice = choose_oldest_eligible(primary, sim_date, PREFERRED_REST_DAYS)
+        if choice:
+            return choice
+
+        choice = choose_oldest_eligible(backup, sim_date, PREFERRED_REST_DAYS)
+        if choice:
+            return choice
+
+        choice = choose_oldest_eligible(primary, sim_date, MIN_ALLOWED_REST_DAYS)
+        if choice:
+            return choice
+
+        choice = choose_oldest_eligible(backup, sim_date, MIN_ALLOWED_REST_DAYS)
+        if choice:
+            return choice
+
+        return None
+
+    predicted_pitcher = None
+    target_rest_snapshot = {}
+
+    # 마지막 실제 경기 다음날부터 타깃까지 날짜별로 시뮬레이션
+    sim_date = last_known_team_game + timedelta(days=1)
+
+    while sim_date <= target_dt:
+        sim_date_str = sim_date.strftime('%Y-%m-%d')
+
+        # 사용자/DB 우취
+        if team_cancels and sim_date_str in team_cancels:
+            has_game = False
+        else:
+            # 마스터데이터에 실제 편성된 경기만 시뮬레이션
+            game_rows = df[
+                (df['날짜'] == sim_date) &
+                (df['팀'] == team) &
+                (df['상태'] != '우천취소')
+            ]
+            has_game = not game_rows.empty
+
+        if not has_game:
+            sim_date += timedelta(days=1)
+            continue
+
+        # 해당 날짜에 이미 선발이 지정돼 있으면 자동 예측보다 우선
+        fixed_row = df[
+            (df['날짜'] == sim_date) &
+            (df['팀'] == team) &
+            (df['상태'] != '우천취소') &
+            (df['선발투수'].notna()) &
+            (df['선발투수'] != '-')
+        ]
+
+        fixed_pitcher = None
+        if not fixed_row.empty:
+            fixed_pitcher = str(fixed_row.iloc[0]['선발투수']).strip()
+            if fixed_pitcher in ('', 'nan'):
+                fixed_pitcher = None
+
+        if fixed_pitcher:
+            available_pitcher = fixed_pitcher
+
+            # 새 콜업/보조 선발이라도 한 번 실제/공식 선발로 잡히면
+            # 이후 미래 예측에서는 로테이션 구성원으로 취급
+            if available_pitcher not in candidate_roles:
+                candidate_roles[available_pitcher] = '주후보'
+                candidate_missed[available_pitcher] = 0
+        else:
+            available_pitcher = choose_predicted_pitcher(sim_date)
+
+        if available_pitcher is None:
+            available_pitcher = '예측 불가'
+
+        # 타깃 날짜에 표시할 휴식일은 "그날 등판하기 직전" 기준
+        if sim_date == target_dt:
+            all_display_pitchers = set(candidate_roles.keys())
+            if available_pitcher != '예측 불가':
+                all_display_pitchers.add(available_pitcher)
+
+            for p in all_display_pitchers:
+                target_rest_snapshot[p] = calc_rest_days(p, target_dt)
+
+            predicted_pitcher = available_pitcher
+            break
+
+        # 앞선 날짜의 예측/확정 선발은 실제 등판한 것으로 가정해서 누적
+        if available_pitcher != '예측 불가':
+            simulated_last_pitched[available_pitcher] = sim_date
+
+            # 보조후보가 한 번 미래 선발로 투입되면
+            # 이후에는 그 예측을 전제로 정상 로테이션에 편입
+            if candidate_roles.get(available_pitcher) == '보조':
+                candidate_roles[available_pitcher] = '가상승격'
+                candidate_missed[available_pitcher] = 0
+
+        sim_date += timedelta(days=1)
+
+    if predicted_pitcher is None:
+        # 타깃 날짜가 경기일이 아닌 예외 상황
+        predicted_pitcher = choose_predicted_pitcher(target_dt)
+        if predicted_pitcher is None:
+            predicted_pitcher = official_starter if official_starter else '예측 불가'
+
+        for p in candidate_roles:
+            target_rest_snapshot[p] = calc_rest_days(p, target_dt)
+
+    # 타깃 오피셜이 후보 명단 밖에 있더라도 버튼/정보 표시는 가능하게 추가
+    if official_starter and official_starter not in candidate_roles:
+        candidate_roles[official_starter] = '주후보'
+        candidate_missed[official_starter] = 0
+        target_rest_snapshot.setdefault(
+            official_starter,
+            calc_rest_days(official_starter, target_dt)
+        )
+
+    # 화면용 후보 표 생성
+    rot_rows = []
+    for p, role in candidate_roles.items():
+        rest = target_rest_snapshot.get(p, calc_rest_days(p, target_dt))
+        rot_rows.append({
             '선발투수': p,
-            '최근등판': last_game_dt,
-            '휴식일': rest_days,
-            '미등판경기': int(games_since_last_start),
-            '구분': rotation_status,
+            '휴식일': '?' if rest == 999 else int(rest),
+            '미등판경기': int(candidate_missed.get(p, 0)),
+            '구분': role,
+            '_last': simulated_last_pitched.get(p, pd.NaT),
         })
 
-    if not candidate_rows:
-        return (
-            official_starter if official_starter else '예측 불가',
-            pd.DataFrame(),
-            is_official,
+    rot_df = pd.DataFrame(rot_rows)
+    if not rot_df.empty:
+        # 화면 정렬: 타깃 기준 오래 쉰 순
+        rot_df['_rest_sort'] = pd.to_numeric(rot_df['휴식일'], errors='coerce').fillna(999)
+        rot_df = (
+            rot_df
+            .sort_values(['_rest_sort', '_last'], ascending=[False, True], na_position='first')
+            .drop(columns=['_rest_sort', '_last'])
+            .reset_index(drop=True)
         )
-
-    rot_df = pd.DataFrame(candidate_rows)
-    rot_df = rot_df.sort_values('최근등판', ascending=True).reset_index(drop=True)
-
-    # 주후보가 지나치게 줄었을 때만 보조후보를 예측 큐에 승격한다.
-    primary_count = int((rot_df['구분'] == '주후보').sum())
-    if primary_count < MIN_PRIMARY_PITCHERS:
-        need = MIN_PRIMARY_PITCHERS - primary_count
-        backup_indices = (
-            rot_df[rot_df['구분'] == '보조']
-            .sort_values(['미등판경기', '최근등판'], ascending=[True, False])
-            .index
-            .tolist()
-        )
-        for idx in backup_indices[:need]:
-            rot_df.at[idx, '구분'] = '승격'
-
-    if is_official:
-        predicted_pitcher = official_starter
-    else:
-        # 기본 예측은 주후보 + 필요한 경우 승격된 후보만 사용한다.
-        active_mask = rot_df['구분'].isin(['주후보', '승격'])
-        active_df = rot_df[active_mask].copy()
-        backup_df = rot_df[rot_df['구분'] == '보조'].copy()
-
-        if active_df.empty:
-            # 방어 로직: 주후보가 0명인 극단 상황에서는 보조후보를 사용
-            active_df = backup_df.copy()
-            backup_df = backup_df.iloc[0:0]
-
-        sim_date = last_known_team_game + timedelta(days=1)
-        sim_rotation_queue = list(active_df['선발투수'])
-        backup_queue = list(backup_df['선발투수'])
-
-        predicted_pitcher = None
-
-        while sim_date <= target_dt:
-            fixed_pitcher = None
-
-            if team_cancels and sim_date.strftime('%Y-%m-%d') in team_cancels:
-                has_game = False
-            else:
-                has_game = not df[
-                    (df['날짜'] == sim_date) &
-                    (df['팀'] == team) &
-                    (df['상태'] != '우천취소')
-                ].empty
-
-                fixed_row = df[
-                    (df['날짜'] == sim_date) &
-                    (df['팀'] == team) &
-                    (df['선발투수'].notna()) &
-                    (df['선발투수'] != '-')
-                ]
-                if not fixed_row.empty:
-                    fixed_pitcher = fixed_row.iloc[0]['선발투수']
-
-            if has_game:
-                temp_queue = []
-                available_pitcher = None
-                used_backup = False
-
-                if fixed_pitcher:
-                    available_pitcher = fixed_pitcher
-                    if fixed_pitcher in sim_rotation_queue:
-                        sim_rotation_queue.remove(fixed_pitcher)
-                    if fixed_pitcher in backup_queue:
-                        backup_queue.remove(fixed_pitcher)
-                else:
-                    # 1) 주후보 큐에서 복귀 전 투수를 건너뛰며 선택
-                    while sim_rotation_queue:
-                        p = sim_rotation_queue.pop(0)
-                        if p in team_absences and sim_date < pd.to_datetime(team_absences[p]):
-                            temp_queue.append(p)
-                        else:
-                            available_pitcher = p
-                            break
-
-                    # 2) 주후보가 모두 unavailable이면 보조후보를 비상 사용
-                    if available_pitcher is None:
-                        for p in list(backup_queue):
-                            if p in team_absences and sim_date < pd.to_datetime(team_absences[p]):
-                                continue
-                            available_pitcher = p
-                            backup_queue.remove(p)
-                            used_backup = True
-                            break
-
-                if available_pitcher is None:
-                    available_pitcher = '예측 불가'
-
-                if sim_date == target_dt:
-                    predicted_pitcher = available_pitcher
-                    for idx, row in rot_df.iterrows():
-                        p_name = row['선발투수']
-                        if p_name in simulated_last_pitched:
-                            last_d = simulated_last_pitched[p_name]
-                            new_rest = max(0, (target_dt - last_d).days - 1)
-                            rot_df.at[idx, '휴식일'] = new_rest
-                    break
-
-                if available_pitcher != '예측 불가':
-                    simulated_last_pitched[available_pitcher] = sim_date
-
-                # 건너뛴 부재 투수는 앞쪽에 유지하고, 실제 등판자는 맨 뒤로 보낸다.
-                if available_pitcher != '예측 불가' and not used_backup:
-                    sim_rotation_queue = temp_queue + sim_rotation_queue + [available_pitcher]
-                else:
-                    sim_rotation_queue = temp_queue + sim_rotation_queue
-                    if used_backup and available_pitcher != '예측 불가':
-                        # 비상 투입된 보조후보는 이후 연속 선택되지 않도록 보조 큐 뒤로 돌린다.
-                        backup_queue.append(available_pitcher)
-
-            sim_date += timedelta(days=1)
-
-        if predicted_pitcher is None:
-            # 타깃 날짜가 팀 경기일이 아닌 등 예외 상황에서 가장 오래 쉰 주후보를 반환
-            fallback_df = rot_df[rot_df['구분'].isin(['주후보', '승격'])]
-            if fallback_df.empty:
-                fallback_df = rot_df
-            predicted_pitcher = fallback_df.iloc[0]['선발투수']
 
     return predicted_pitcher, rot_df[['선발투수', '휴식일', '미등판경기', '구분']], is_official
 
