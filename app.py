@@ -757,110 +757,6 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             db_override_val = db_overrides.get((team, dt_str))
 
-            # 미래 자동 예측에만 간단한 우취 횟수 시뮬레이터를 제공한다.
-            # 조회일 직전 예정 경기부터 취소된다고 가정해 기존 예측기를 다시 실행한다.
-            today_kst = pd.Timestamp.now(tz='Asia/Seoul').tz_localize(None).normalize()
-            can_use_rainout_scenario = (
-                selected_dt > today_kst and
-                not is_official and
-                not local_override_val and
-                not db_override_val
-            )
-            scenario_dates = []
-            if can_use_rainout_scenario:
-                scheduled_rows = working_df[
-                    (working_df['팀'] == team) &
-                    (working_df['날짜'] >= today_kst) &
-                    (working_df['날짜'] < selected_dt) &
-                    (working_df['상태'].isin(['예정', '수동확정']))
-                ]
-                existing_cancel_dates = set(combined_cancels)
-                scenario_dates = [
-                    pd.to_datetime(d).strftime("%Y-%m-%d")
-                    for d in sorted(scheduled_rows['날짜'].dropna().unique())
-                    if pd.to_datetime(d).strftime("%Y-%m-%d") not in existing_cancel_dates
-                ]
-
-            max_scenario_count = len(scenario_dates)
-            if max_scenario_count > 0:
-                scenario_key = f"rainout_scenario_{team}_{dt_str}"
-                if scenario_key not in st.session_state:
-                    st.session_state[scenario_key] = 0
-                elif st.session_state[scenario_key] > max_scenario_count:
-                    st.session_state[scenario_key] = max_scenario_count
-
-                with st.popover("☔ 우취 발생시"):
-                    st.markdown(
-                        """
-                        <style>
-                        div[data-testid="stPopoverBody"] div[data-testid="stButton"] button {
-                            min-height: 1.75rem !important;
-                            height: 1.75rem !important;
-                            padding: 0 0.45rem !important;
-                            margin: 0 auto;
-                        }
-                        div[data-testid="stPopoverBody"] div[data-testid="stButton"] button p {
-                            font-size: 0.78rem !important;
-                            line-height: 1 !important;
-                        }
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    scenario_count = int(st.session_state[scenario_key])
-                    minus_col, count_col, plus_col = st.columns([1, 3, 1])
-
-                    with minus_col:
-                        if st.button(
-                            "−",
-                            key=f"{scenario_key}_minus",
-                            disabled=scenario_count <= 0,
-                        ):
-                            st.session_state[scenario_key] = scenario_count - 1
-                            st.rerun()
-
-                    with count_col:
-                        st.markdown(
-                            f"<div style='text-align:center; font-size:0.9rem; font-weight:800; padding-top:0.2rem;'>{scenario_count}회</div>",
-                            unsafe_allow_html=True,
-                        )
-
-                    with plus_col:
-                        if st.button(
-                            "+",
-                            key=f"{scenario_key}_plus",
-                            disabled=scenario_count >= max_scenario_count,
-                        ):
-                            st.session_state[scenario_key] = scenario_count + 1
-                            st.rerun()
-
-                    assumed_cancel_dates = scenario_dates[-scenario_count:] if scenario_count else []
-                    if assumed_cancel_dates:
-                        scenario_cancels = sorted(set(combined_cancels) | set(assumed_cancel_dates))
-                        scenario_predicted, scenario_rotation_df, _ = predict_starter(
-                            working_df,
-                            team,
-                            selected_dt,
-                            team_absences=combined_absences,
-                            excluded_pitchers=team_db_excluded,
-                            team_cancels=scenario_cancels,
-                        )
-                        if not scenario_rotation_df.empty:
-                            predicted = scenario_predicted
-                            rotation_df = scenario_rotation_df
-
-                    prediction_col, reset_col = st.columns([3, 1])
-                    with prediction_col:
-                        st.markdown(f"**예측 선발: {predicted}**")
-                    with reset_col:
-                        if st.button(
-                            "초기화",
-                            key=f"{scenario_key}_reset",
-                            disabled=scenario_count == 0,
-                        ):
-                            st.session_state[scenario_key] = 0
-                            st.rerun()
-
             if local_override_val:
                 final_pitcher = local_override_val
                 pitcher_source = "로컬 적용"
@@ -883,41 +779,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             show_pitcher = st.session_state[pitcher_key]
 
-            rotation_names = set(rotation_df['선발투수'].values)
-            show_return_date = combined_absences.get(show_pitcher)
-            show_is_absent = (
-                show_return_date is not None and
-                selected_dt.date() < pd.to_datetime(show_return_date).date()
-            )
-            show_is_official = is_official and show_pitcher == predicted
-            # 완전 제외는 화면에서 숨기되, 새 오피셜 선발 발표가 있으면 그 날짜에 한해 복귀시킨다.
-            show_is_excluded = show_pitcher in team_db_excluded and not show_is_official
-            show_is_explicit = (
-                show_pitcher == final_pitcher and
-                pitcher_source in ["로컬 적용", "DB 공식", "오피셜"]
-            )
-
-            # 이전에 눌러둔 투수가 말소·제외·자동 탈락한 뒤 후보로 되살아나지 않게 한다.
-            if (
-                show_pitcher and
-                show_pitcher not in rotation_names and
-                (show_is_absent or show_is_excluded or not show_is_explicit)
-            ):
-                if predicted in rotation_names:
-                    show_pitcher = predicted
-                else:
-                    show_pitcher = rotation_df.iloc[0]['선발투수']
-                st.session_state[pitcher_key] = show_pitcher
-
-            # 수동/DB/오피셜 지정만 활성 후보 밖에서도 상세 조회용으로 표시한다.
-            if (
-                show_pitcher and
-                show_pitcher not in rotation_names and
-                show_pitcher != "예측 불가" and
-                show_pitcher != "-" and
-                not show_is_absent and
-                not show_is_excluded
-            ):
+            if show_pitcher and show_pitcher != "예측 불가" and show_pitcher != "-" and show_pitcher not in rotation_df['선발투수'].values:
                 p_games = working_df[(working_df['팀'] == team) & 
                                      (working_df['상태'].isin(['종료', '수동확정', '노게임'])) & 
                                      (working_df['선발투수'] == show_pitcher) & 
@@ -955,6 +817,8 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     ret_dt = pd.to_datetime(combined_absences[p]).date()
                     if selected_dt.date() < ret_dt:
                         info_badges.append(f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>")
+                if p in team_db_excluded:
+                    info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
                 separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"
@@ -1002,8 +866,15 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                 pname = rot_row['선발투수']
                 with btn_cols[j]:
                     is_active = (show_pitcher == pname)
-
-                    if pname == predicted:
+                    
+                    is_absent = False
+                    if pname in combined_absences and selected_dt.date() < combined_absences[pname]:
+                        is_absent = True
+                    
+                    if is_absent:
+                        return_date_str = combined_absences[pname].strftime('%m/%d')
+                        btn_text = f"{pname}\n({return_date_str} 복귀)"
+                    elif pname == predicted:
                         if is_official:
                             btn_text = f"✅오피셜\n{pname}\n({rot_row['휴식일']}일)"
                         else:
@@ -1011,7 +882,7 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
                     else:
                         btn_text = f"\n{pname}\n({rot_row['휴식일']}일)"
                         
-                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True):
+                    if st.button(btn_text, key=f"btn_{pitcher_key}_{pname}", type="primary" if is_active else "secondary", use_container_width=True, disabled=is_absent):
                         st.session_state[pitcher_key] = pname; st.rerun()
 
             if show_pitcher:
