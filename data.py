@@ -23,8 +23,7 @@ def master_collector_v21():
     # 일정 수집 범위: 앱 달력에 보여줄 KBO 편성표 확보 구간
     # 후반기 일정이 달력에서 비지 않도록 넉넉히 확보하되, 선발 API는 호출하지 않음
     schedule_start_date = detail_start_date
-    season_scheduled_end = date(2026, 9, 6)  # 2026 KBO 우선 편성 일정 기준
-    schedule_end_date = min(today_obj + timedelta(days=75), season_scheduled_end)
+    schedule_end_date = min(today_obj + timedelta(days=75))
 
     print(
         "🚀 [V22] 일정/상세 수집 분리 모드 가동! "
