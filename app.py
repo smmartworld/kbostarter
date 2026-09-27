@@ -751,11 +751,24 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             team_db_excluded = [p for t, p in db_excluded if t == team]
 
+            # 관리자 로테이션 제외는 화면/예측/수동 선택보다 우선한다.
+            # 이미 로컬 수동 지정돼 있던 선수도 제외 처리되면 즉시 해제한다.
+            if local_override_val in team_db_excluded:
+                st.session_state.overrides.pop((team, dt_str), None)
+                local_override_val = None
+
             predicted, rotation_df, is_official = predict_starter(working_df, team, selected_dt, team_absences=combined_absences, excluded_pitchers=team_db_excluded, team_cancels=combined_cancels)
+
+            # predictor에서도 제외하지만 UI에서도 한 번 더 필터링해서
+            # 세션/과거 데이터 때문에 제외 선수가 버튼으로 되살아나는 것을 방지한다.
+            if not rotation_df.empty:
+                rotation_df = rotation_df[~rotation_df['선발투수'].isin(team_db_excluded)].reset_index(drop=True)
             
             if rotation_df.empty: st.warning("데이터 부족"); return
 
             db_override_val = db_overrides.get((team, dt_str))
+            if db_override_val in team_db_excluded:
+                db_override_val = None
 
             if local_override_val:
                 final_pitcher = local_override_val
@@ -779,7 +792,19 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
 
             show_pitcher = st.session_state[pitcher_key]
 
-            if show_pitcher and show_pitcher != "예측 불가" and show_pitcher != "-" and show_pitcher not in rotation_df['선발투수'].values:
+            # 직전에 보고 있던 선수가 관리자에서 제외됐다면 세션 선택도 즉시 교체한다.
+            if show_pitcher in team_db_excluded:
+                show_pitcher = predicted
+                st.session_state[pitcher_key] = predicted
+                st.session_state[final_key] = predicted
+
+            if (
+                show_pitcher
+                and show_pitcher != "예측 불가"
+                and show_pitcher != "-"
+                and show_pitcher not in team_db_excluded
+                and show_pitcher not in rotation_df['선발투수'].values
+            ):
                 p_games = working_df[(working_df['팀'] == team) & 
                                      (working_df['상태'].isin(['종료', '수동확정', '노게임'])) & 
                                      (working_df['선발투수'] == show_pitcher) & 
@@ -813,12 +838,14 @@ def render_team_panel(col, team: str, pitcher_key: str, is_away: bool):
             team_pitchers = working_df[working_df['팀'] == team]['선발투수'].dropna().unique()
 
             for p in team_pitchers:
+                # 로테이션 제외 선수는 상태창에서도 완전히 숨긴다.
+                # 관리자 DB 패널에는 삭제/복구를 위해 등록 기록이 그대로 남는다.
+                if p in team_db_excluded:
+                    continue
                 if p in combined_absences:
                     ret_dt = pd.to_datetime(combined_absences[p]).date()
                     if selected_dt.date() < ret_dt:
                         info_badges.append(f"<span style='color:#d69e2e; font-weight:700;'>⏸️ {p}(~{ret_dt.strftime('%m/%d')})</span>")
-                if p in team_db_excluded:
-                    info_badges.append(f"<span style='color:#e53e3e; font-weight:700;'>🚫 {p}(제외)</span>")
 
             if info_badges:
                 separator = "<span style='color:#cbd5e0; margin: 0 10px;'>/</span>"

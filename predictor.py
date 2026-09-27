@@ -1,7 +1,7 @@
 import pandas as pd
 from datetime import timedelta
 
-PREDICTOR_VERSION = "V4.1-sim-rest-20260903"
+PREDICTOR_VERSION = "V4.2-exclusion-clean-20260927"
 
 TEAM_COLORS = {
     '삼성': '#074CA1', '두산': '#131230', 'LG': '#C30452', 'KT': '#000000', 'SSG': '#CE0E2D',
@@ -93,6 +93,12 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
         official_starter = str(official_row.iloc[0]['선발투수']).strip()
         if official_starter not in ('nan', ''):
             is_official = True
+
+    # 관리자 '로테이션 제외'가 가장 높은 우선순위다.
+    # 시즌 종료/귀국/전력 이탈 선수가 과거 오피셜 데이터 때문에 다시 나타나지 않게 한다.
+    if official_starter in excluded_pitchers:
+        official_starter = None
+        is_official = False
 
     # 실제로 소화된 선발 기록만 기준점으로 사용
     # 노게임은 기록은 무효지만 실제 투구/휴식에는 영향을 줬으므로 포함
@@ -262,6 +268,11 @@ def predict_starter(df, team, target_date, team_absences=None, excluded_pitchers
             fixed_pitcher = str(fixed_row.iloc[0]['선발투수']).strip()
             if fixed_pitcher in ('', 'nan'):
                 fixed_pitcher = None
+
+        # 미래 일정에 예전 수동/오피셜 선발값이 남아 있어도
+        # 관리자에서 로테이션 제외한 투수는 다시 시뮬레이션에 넣지 않는다.
+        if fixed_pitcher in excluded_pitchers:
+            fixed_pitcher = None
 
         if fixed_pitcher:
             available_pitcher = fixed_pitcher
